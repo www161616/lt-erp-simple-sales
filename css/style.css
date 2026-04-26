@@ -1,0 +1,203 @@
+/* ============================================================
+   LT-ERP 簡易銷貨單 — 共用樣式
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Heiti TC', sans-serif;
+  background: #f5f7fa;
+  color: #2c3e50;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.view { min-height: 100vh; }
+
+/* ============================================================
+   載入中
+   ============================================================ */
+#boot-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.boot {
+  font-size: 16px;
+  color: #1976d2;
+}
+
+
+/* ============================================================
+   登入畫面
+   ============================================================ */
+#login-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 50%, #42a5f5 100%);
+}
+
+.login-card {
+  background: white;
+  width: 100%;
+  max-width: 400px;
+  padding: 32px;
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+.login-card h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+  color: #1565c0;
+}
+
+.login-card .subtitle {
+  font-size: 13px;
+  color: #777;
+  margin-bottom: 24px;
+}
+
+.login-card label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #555;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.login-card input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+}
+
+.login-card button[type=submit] {
+  width: 100%;
+  margin-top: 22px;
+  padding: 12px;
+  background: #1565c0;
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.login-card button:hover { background: #0d47a1; }
+.login-card button:disabled { background: #aaa; cursor: not-allowed; }
+
+.login-card .footer-note {
+  margin-top: 18px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+}
+
+.error {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+
+/* ============================================================
+   主畫面 topbar
+   ============================================================ */
+.topbar {
+  background: white;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.topbar h1 {
+  font-size: 18px;
+  color: #1565c0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.topbar-right #current-user {
+  color: #555;
+  font-family: monospace;
+}
+
+.btn-secondary {
+  padding: 6px 14px;
+  background: #eceff1;
+  color: #455a64;
+  border: 0;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-secondary:hover { background: #cfd8dc; }
+
+
+/* ============================================================
+   主內容
+   ============================================================ */
+#main-content {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.placeholder {
+  background: white;
+  padding: 24px 28px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.placeholder h2 {
+  color: #2e7d32;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.placeholder p { margin-bottom: 8px; }
+
+.placeholder ul {
+  margin: 12px 0 12px 24px;
+}
+
+.placeholder li {
+  margin-bottom: 4px;
+}
+
+.placeholder .hint {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 4px;
+  font-size: 13px;
+}
