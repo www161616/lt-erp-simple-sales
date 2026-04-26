@@ -39,20 +39,95 @@
     </header>
 
     <main id="main-content">
-      <!-- B 段第一版：占位畫面 -->
-      <div class="placeholder">
-        <h2>✅ 登入成功</h2>
-        <p><strong>B 段（登入機制）已通過驗收。</strong></p>
-        <p>下個版本（C 段 + D 段）會加：</p>
-        <ul>
-          <li>📋 訂單列表 + 篩選器（今日 / 明日 / 7 天 / 30 天 / 店家 / 狀態 / 退貨狀態 / 單號搜尋）</li>
-          <li>🔍 點單號 → 明細 modal</li>
-          <li>📄 單張列印（A5）</li>
-          <li>📄 批次列印今日 18 家</li>
-        </ul>
-        <p class="hint">目前可測試：登入 → 看到此畫面 → 登出 → 再登入</p>
-      </div>
+
+      <!-- 篩選 bar -->
+      <section class="filter-bar">
+        <div class="quick-buttons">
+          <button type="button" data-quick="today">今日</button>
+          <button type="button" data-quick="tomorrow">明日</button>
+          <button type="button" data-quick="7days">近 7 天</button>
+          <button type="button" data-quick="30days">近 30 天</button>
+        </div>
+        <div class="filter-row">
+          <span class="filter-group">
+            <label>日期區間（出貨日）</label>
+            <span class="date-range">
+              <input type="date" id="filter-from">
+              <span class="dash">~</span>
+              <input type="date" id="filter-to">
+            </span>
+          </span>
+          <span class="filter-group">
+            <label>店家</label>
+            <select id="filter-store"><option value="">全部</option></select>
+          </span>
+          <span class="filter-group">
+            <label>狀態</label>
+            <select id="filter-status">
+              <option value="">全部</option>
+              <option value="待處理">待處理</option>
+              <option value="已建單">已建單</option>
+              <option value="已收到">已收到</option>
+              <option value="有問題">有問題</option>
+            </select>
+          </span>
+          <span class="filter-group">
+            <label>退貨</label>
+            <select id="filter-return">
+              <option value="">全部</option>
+              <option value="無">無</option>
+              <option value="申請中">申請中</option>
+              <option value="處理中">處理中</option>
+              <option value="已解決">已解決</option>
+            </select>
+          </span>
+          <span class="filter-group">
+            <label>單號搜尋</label>
+            <input type="text" id="filter-search" placeholder="SS-...">
+          </span>
+          <span class="filter-actions">
+            <button type="button" id="btn-search" class="btn-primary">🔍 查詢</button>
+            <button type="button" id="btn-reset" class="btn-secondary">重設</button>
+          </span>
+        </div>
+      </section>
+
+      <!-- 狀態列 -->
+      <div id="status-bar" class="status-bar" style="display:none;"></div>
+
+      <!-- 訂單列表 -->
+      <section class="orders-card">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>單號</th>
+              <th>店家</th>
+              <th>訂單日</th>
+              <th>出貨日</th>
+              <th class="r">件數</th>
+              <th class="r">金額</th>
+              <th>狀態</th>
+              <th>退貨</th>
+              <th class="c">動作</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody">
+            <tr><td colspan="9" class="empty">⏳ 載入中...</td></tr>
+          </tbody>
+        </table>
+      </section>
     </main>
+  </div>
+
+  <!-- 明細 modal -->
+  <div id="detail-modal" class="modal" style="display:none;">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close-btn" type="button">✕</button>
+      <div id="modal-body">
+        <div class="loading">⏳ 載入中...</div>
+      </div>
+    </div>
   </div>
 
   <!-- 載入中 -->

@@ -17,7 +17,34 @@ window.ltCallRpc = async function (funcName, params) {
 };
 
 
-// C 段會加：
-// - ltGetAllOrders(filters)
-// - ltGetOrderDetails(orderNo)
-// - ltGetOrdersBatch(orderNos)
+// ============================================================
+// C 段：訂單列表 + 單張明細
+// ============================================================
+
+// 取訂單列表（filters 為 {from, to, store, status, returnStatus, search, limit}）
+window.ltGetAllOrders = async function (filters) {
+  filters = filters || {};
+  return await ltCallRpc('simple_get_all_orders', {
+    p_admin_secret:  null,             // 前端走 JWT
+    p_delivery_from: filters.from         || null,
+    p_delivery_to:   filters.to           || null,
+    p_store_name:    filters.store        || null,
+    p_status:        filters.status       || null,
+    p_return_status: filters.returnStatus || null,
+    p_search:        filters.search       || null,
+    p_limit:         filters.limit        || 500
+  });
+};
+
+
+// 取單張訂單明細，回傳 { order, items }
+window.ltGetOrderDetails = async function (orderNo) {
+  return await ltCallRpc('simple_get_order_details_admin', {
+    p_admin_secret: null,
+    p_order_no:     orderNo
+  });
+};
+
+
+// D 段會加：
+// - ltGetOrdersBatch(orderNos) — 批次列印今日 18 家用
