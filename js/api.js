@@ -46,5 +46,18 @@ window.ltGetOrderDetails = async function (orderNo) {
 };
 
 
-// D 段會加：
-// - ltGetOrdersBatch(orderNos) — 批次列印今日 18 家用
+// 批次取多張單明細（給列印頁用）
+//   回傳 array：[ {order, items} | {order_no, missing:true} | {order_no, draft_blocked:true, message} ]
+//   後端 simple_get_orders_details_batch 一次最多 100 筆，A 段已擋暫存單
+window.ltGetOrdersBatch = async function (orderNos) {
+  if (!Array.isArray(orderNos) || orderNos.length === 0) {
+    throw new Error('orderNos 必須是非空陣列');
+  }
+  if (orderNos.length > 100) {
+    throw new Error('一次最多 100 張單，請分批列印');
+  }
+  return await ltCallRpc('simple_get_orders_details_batch', {
+    p_admin_secret: null,
+    p_order_nos:    orderNos
+  });
+};

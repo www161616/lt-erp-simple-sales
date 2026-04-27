@@ -1,0 +1,275 @@
+/* ============================================================
+   LT-ERP 簡易銷貨單 — 列印頁樣式
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Microsoft JhengHei', 'PingFang TC', 'Heiti TC', sans-serif;
+  background: #eceff1;
+  color: #2c3e50;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   頂部工具列（畫面用，列印時隱藏）
+   ============================================================ */
+.toolbar {
+  background: white;
+  padding: 10px 18px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.toolbar h1 {
+  font-size: 16px;
+  color: #1565c0;
+  display: inline-block;
+  margin-right: 12px;
+}
+.toolbar #status {
+  font-size: 13px;
+  color: #555;
+}
+.toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  padding: 8px 14px;
+  font-size: 13px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+}
+.btn-primary {
+  background: #1565c0;
+  color: white;
+}
+.btn-primary:hover { background: #0d47a1; }
+.btn-secondary {
+  background: #eceff1;
+  color: #455a64;
+}
+.btn-secondary:hover { background: #cfd8dc; }
+
+
+/* ============================================================
+   載入中
+   ============================================================ */
+.loading-screen {
+  padding: 60px 20px;
+  text-align: center;
+}
+.loader-text {
+  font-size: 16px;
+  color: #1976d2;
+}
+
+
+/* ============================================================
+   列印頁面（A5 直印，每張單一頁）
+   ============================================================ */
+#print-area {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.print-page {
+  background: white;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border-radius: 4px;
+  /* A5 ratio for screen preview */
+  min-height: 740px; /* A5 = 148mm × 210mm 約螢幕 559×793px */
+}
+
+.print-page.missing {
+  background: #ffebee;
+  color: #c62828;
+  text-align: center;
+  padding: 40px;
+  min-height: 200px;
+}
+
+.print-header {
+  text-align: center;
+  border-bottom: 2px solid #1565c0;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.print-header .company {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1565c0;
+}
+.print-header .doctitle {
+  font-size: 14px;
+  letter-spacing: 6px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.print-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.print-info .row {
+  display: flex;
+  gap: 8px;
+}
+.print-info .label {
+  color: #555;
+  font-weight: bold;
+  min-width: 56px;
+}
+.print-info .order-no {
+  font-family: monospace;
+  font-weight: bold;
+  color: #1565c0;
+}
+
+.print-status-row {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.print-status-row .status-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-weight: bold;
+  margin-right: 8px;
+}
+.s-pending  { background: #fff3e0; color: #e65100; }
+.s-issued   { background: #e3f2fd; color: #1565c0; }
+.s-received { background: #e8f5e9; color: #2e7d32; }
+.s-issue    { background: #ffebee; color: #c62828; }
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.print-table th,
+.print-table td {
+  border: 1px solid #aaa;
+  padding: 4px 6px;
+}
+.print-table th {
+  background: #eceff1;
+  text-align: left;
+  font-weight: bold;
+}
+.print-table td.r { text-align: right; }
+.print-table td.c { text-align: center; }
+.print-table tfoot td {
+  background: #f5f5f5;
+  font-weight: bold;
+}
+.print-table .pid { font-family: monospace; font-size: 11px; }
+
+.print-footer {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #555;
+}
+.print-footer .signatures {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.print-footer .sig-line {
+  border-bottom: 1px solid #555;
+  flex: 1;
+  padding-bottom: 2px;
+  text-align: center;
+  min-height: 18px;
+}
+.print-footer .sig-label {
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.print-return-warn {
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: #fff3e0;
+  border-left: 3px solid #ff9800;
+  font-size: 11px;
+  color: #e65100;
+}
+.print-return-warn .item {
+  margin-top: 2px;
+}
+
+
+/* ============================================================
+   @media print — 真正列印時的覆蓋規則
+   ============================================================ */
+@page {
+  size: A5;
+  margin: 8mm 10mm;
+}
+
+@media print {
+  body {
+    background: white;
+    font-size: 11px;
+  }
+  .no-print { display: none !important; }
+  #loading { display: none !important; }
+
+  #print-area {
+    padding: 0;
+    max-width: none;
+  }
+
+  .print-page {
+    background: white;
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    min-height: auto;
+    page-break-after: always;
+  }
+  .print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .print-header {
+    border-bottom: 1.5px solid #000;
+  }
+  .print-header .company { font-size: 14px; color: #000; }
+  .print-header .doctitle { font-size: 12px; }
+
+  .print-info { font-size: 11px; }
+  .print-info .order-no { color: #000; }
+
+  .print-table {
+    font-size: 10px;
+  }
+  .print-table th { background: #ddd; }
+  .print-table tfoot td { background: #f0f0f0; }
+
+  .s-pending, .s-issued, .s-received, .s-issue {
+    border: 1px solid currentColor;
+  }
+}

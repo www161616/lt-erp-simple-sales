@@ -304,8 +304,22 @@ body {
 
 
 /* ============================================================
-   狀態列
+   狀態列 + 批次列印
    ============================================================ */
+.status-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+.status-row .status-bar { flex: 1; margin-bottom: 0; }
+.status-row #btn-batch-print {
+  height: auto;
+  padding: 0 18px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .status-bar {
   padding: 10px 14px;
   border-radius: 4px;

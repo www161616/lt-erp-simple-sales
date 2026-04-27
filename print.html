@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>列印簡易銷貨單 — LT-ERP</title>
+  <link rel="stylesheet" href="css/print.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- 頂部工具列（列印時隱藏） -->
+  <header class="toolbar no-print">
+    <div class="toolbar-left">
+      <h1>📄 列印銷貨單</h1>
+      <span id="status"></span>
+    </div>
+    <div class="toolbar-right">
+      <button type="button" id="btn-back" class="btn-secondary">← 回訂單列表</button>
+      <button type="button" id="btn-print" class="btn-primary">🖨️ 再印一次</button>
+    </div>
+  </header>
+
+  <!-- 載入中 -->
+  <div id="loading" class="loading-screen">
+    <div class="loader-text">⏳ 載入中...</div>
+  </div>
+
+  <!-- 列印內容（每張單一個 .print-page） -->
+  <main id="print-area"></main>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/print.js"></script>
+</body>
+</html>

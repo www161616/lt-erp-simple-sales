@@ -124,10 +124,27 @@ function setStatusBar(msg, type) {
   el.style.display = '';
 }
 
+// 當前可列印的非暫存單號（給批次列印按鈕用）
+let _lastPrintableOrders = [];
+
+function updateBatchPrintButton() {
+  const btn = document.getElementById('btn-batch-print');
+  if (!btn) return;
+  const n = _lastPrintableOrders.length;
+  if (n === 0) {
+    btn.style.display = 'none';
+  } else {
+    btn.style.display = '';
+    btn.textContent = '📄 列印當前列表（' + n + ' 張）';
+  }
+}
+
 async function doSearch() {
   setStatusBar('查詢中...', 'info');
   const tbody = document.getElementById('orders-tbody');
   tbody.innerHTML = '<tr><td colspan="9" class="empty">⏳ 載入中...</td></tr>';
+  _lastPrintableOrders = [];
+  updateBatchPrintButton();
 
   try {
     const filters = getCurrentFilters();
@@ -158,10 +175,34 @@ async function doSearch() {
       setStatusBar(msg, 'success');
     }
     renderOrders(arr);
+
+    // 任務 4 D 段：把可列印的非暫存單號收集起來給批次列印
+    _lastPrintableOrders = arr.filter(o => !o.is_draft).map(o => o.order_no);
+    updateBatchPrintButton();
   } catch (err) {
     setStatusBar('❌ 查詢失敗：' + err.message, 'error');
     tbody.innerHTML = '<tr><td colspan="9" class="empty">查詢失敗</td></tr>';
   }
+}
+
+function doBatchPrint() {
+  const orders = _lastPrintableOrders;
+  if (!orders || orders.length === 0) {
+    alert('沒有可列印的單（暫存單不可列印）');
+    return;
+  }
+  if (orders.length > 100) {
+    alert('一次最多 100 張，目前 ' + orders.length + ' 張。請先縮小篩選範圍。');
+    return;
+  }
+  // 確認彈窗（10 張以上才問，避免 admin 點按鈕後又被打斷）
+  if (orders.length >= 10) {
+    if (!confirm('確定要列印 ' + orders.length + ' 張銷貨單？\n\n會在新分頁開啟列印頁，每張單獨立 A5 一頁。')) {
+      return;
+    }
+  }
+  const url = 'print.html?orders=' + encodeURIComponent(orders.join(','));
+  window.open(url, '_blank');
 }
 
 function doReset() {
@@ -310,7 +351,7 @@ function renderModalBody(data) {
   if (isDraft) {
     html += '<button class="btn-disabled" disabled title="暫存單不可列印">🚫 暫存單不可列印</button>';
   } else {
-    html += '<button class="btn-disabled" disabled title="任務 4 D 段列印開放">📄 列印此單（任務 4 D 段開放）</button>';
+    html += '<button class="btn-primary" id="btn-print-this">📄 列印此單</button>';
   }
   html += '<button class="btn-secondary" id="btn-close-modal-bottom">✕ 關閉</button>';
   html += '</div>';
@@ -318,6 +359,14 @@ function renderModalBody(data) {
   const body = document.getElementById('modal-body');
   body.innerHTML = html;
   body.querySelector('#btn-close-modal-bottom').addEventListener('click', closeDetailModal);
+  // ⚡ 任務 4 D 段：列印此單 → 開新分頁跳到 print.html
+  const btnPrint = body.querySelector('#btn-print-this');
+  if (btnPrint && !isDraft) {
+    btnPrint.addEventListener('click', function () {
+      const url = 'print.html?orders=' + encodeURIComponent(o.order_no);
+      window.open(url, '_blank');
+    });
+  }
 }
 
 
@@ -371,6 +420,8 @@ function formatTs(ts) {
   // 查詢 / 重設
   document.getElementById('btn-search').addEventListener('click', doSearch);
   document.getElementById('btn-reset').addEventListener('click', doReset);
+  // 批次列印
+  document.getElementById('btn-batch-print').addEventListener('click', doBatchPrint);
   // 單號搜尋按 Enter
   document.getElementById('filter-search').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
