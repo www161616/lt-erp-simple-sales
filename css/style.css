@@ -313,7 +313,8 @@ body {
   margin-bottom: 12px;
 }
 .status-row .status-bar { flex: 1; margin-bottom: 0; }
-.status-row #btn-batch-print {
+.status-row #btn-batch-print,
+.status-row #btn-export-excel {
   height: auto;
   padding: 0 18px;
   font-size: 13px;

@@ -6,6 +6,7 @@
   <title>LT-ERP 簡易銷貨單</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -93,10 +94,11 @@
         </div>
       </section>
 
-      <!-- 狀態列 + 批次列印 -->
+      <!-- 狀態列 + 批次列印 + Excel 匯出 -->
       <div class="status-row">
         <div id="status-bar" class="status-bar" style="display:none;"></div>
         <button type="button" id="btn-batch-print" class="btn-primary" style="display:none;">📄 列印當前列表</button>
+        <button type="button" id="btn-export-excel" class="btn-secondary" style="display:none;">📊 匯出 Excel</button>
       </div>
 
       <!-- 訂單列表 -->

@@ -225,29 +225,36 @@ button {
    ============================================================ */
 @page {
   size: A5;
-  margin: 8mm 10mm;
+  margin: 5mm;  /* 邊界縮到最小（再小可能被印表機截掉）*/
 }
 
 @media print {
-  body {
-    background: white;
+  html, body {
+    background: white !important;
     font-size: 11px;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
   }
   .no-print { display: none !important; }
   #loading { display: none !important; }
 
   #print-area {
-    padding: 0;
-    max-width: none;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    border: 0 !important;
   }
 
   .print-page {
-    background: white;
-    box-shadow: none;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-    min-height: auto;
+    background: white !important;
+    box-shadow: none !important;  /* 強制清掉預覽用的陰影 */
+    border: 0 !important;          /* 強制清掉所有邊框（防止左邊神秘細線）*/
+    outline: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    min-height: auto !important;
     page-break-after: always;
   }
   .print-page:last-child {
@@ -258,7 +265,6 @@ button {
     border-bottom: 1.5px solid #000;
   }
   .print-header .company { font-size: 14px; color: #000; }
-  .print-header .doctitle { font-size: 12px; }
 
   .print-info { font-size: 11px; }
   .print-info .order-no { color: #000; }

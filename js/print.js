@@ -55,10 +55,9 @@ function renderPage(entry) {
   const items = entry.items || [];
   let html = '<div class="print-page">';
 
-  // 標頭
+  // 標頭（簡化版：只留公司名，副標拿掉）
   html += '<div class="print-header">';
   html += '<div class="company">丸十水產股份有限公司</div>';
-  html += '<div class="doctitle">簡易銷貨單（龍潭總倉）</div>';
   html += '</div>';
 
   // 主要欄位
@@ -130,13 +129,9 @@ function renderPage(entry) {
     html += '</div>';
   }
 
-  // 簽名區
+  // 頁尾（簡化版：只留撿貨員 + 建單時間，簽名區拿掉）
   html += '<div class="print-footer">';
   html += '<div>撿貨員：' + escHtml(o.picker_email || '-') + '　／　建單時間：' + (o.created_at ? formatTs(o.created_at) : '-') + '</div>';
-  html += '<div class="signatures">';
-  html += '<div><span class="sig-label">總倉出貨：</span><span class="sig-line">　</span></div>';
-  html += '<div><span class="sig-label">店家簽收：</span><span class="sig-line">　</span></div>';
-  html += '</div>';
   html += '</div>';
 
   html += '</div>';

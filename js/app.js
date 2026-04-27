@@ -128,14 +128,21 @@ function setStatusBar(msg, type) {
 let _lastPrintableOrders = [];
 
 function updateBatchPrintButton() {
-  const btn = document.getElementById('btn-batch-print');
-  if (!btn) return;
+  const btn      = document.getElementById('btn-batch-print');
+  const btnExcel = document.getElementById('btn-export-excel');
   const n = _lastPrintableOrders.length;
   if (n === 0) {
-    btn.style.display = 'none';
+    if (btn)      btn.style.display = 'none';
+    if (btnExcel) btnExcel.style.display = 'none';
   } else {
-    btn.style.display = '';
-    btn.textContent = '📄 列印當前列表（' + n + ' 張）';
+    if (btn) {
+      btn.style.display = '';
+      btn.textContent = '📄 列印當前列表（' + n + ' 張）';
+    }
+    if (btnExcel) {
+      btnExcel.style.display = '';
+      btnExcel.textContent = '📊 匯出 Excel（' + n + ' 張）';
+    }
   }
 }
 
@@ -203,6 +210,125 @@ function doBatchPrint() {
   }
   const url = 'print.html?orders=' + encodeURIComponent(orders.join(','));
   window.open(url, '_blank');
+}
+
+
+// ============================================================
+// Excel 匯出（任務 4 D 段補充）
+// ============================================================
+async function doExportExcel() {
+  const orders = _lastPrintableOrders;
+  if (!orders || orders.length === 0) {
+    alert('沒有可匯出的資料（暫存單不會匯出）');
+    return;
+  }
+  if (orders.length > 100) {
+    alert('一次最多 100 張，目前 ' + orders.length + ' 張。請先縮小篩選範圍。');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('XLSX library 未載入，請重整頁面再試');
+    return;
+  }
+
+  setStatusBar('Excel 匯出中（拉資料）...', 'info');
+
+  let result;
+  try {
+    result = await ltGetOrdersBatch(orders);
+  } catch (err) {
+    setStatusBar('❌ 匯出失敗：' + err.message, 'error');
+    return;
+  }
+
+  // 組明細列表
+  const rows = [];
+  let totalQty = 0;
+  let totalAmount = 0;
+  let validOrderCount = 0;
+  for (let i = 0; i < result.length; i++) {
+    const entry = result[i];
+    if (entry.missing || entry.draft_blocked) continue;
+    const o = entry.order || {};
+    const items = entry.items || [];
+    validOrderCount++;
+    for (let j = 0; j < items.length; j++) {
+      const it = items[j];
+      const subtotal = Number(it.subtotal) || 0;
+      const qty = it.qty || 0;
+      rows.push({
+        '單號':     o.order_no || '',
+        '店家':     o.store_name || '',
+        '訂單日':   o.order_date || '',
+        '出貨日':   o.delivery_date || '',
+        '商品編號': it.product_id || '',
+        '商品名稱': it.product_name || '',
+        '數量':     qty,
+        '單價':     Number(it.unit_price) || 0,
+        '小計':     subtotal,
+        '訂單狀態': o.status || '',
+        '退貨狀態': it.return_status || '無'
+      });
+      totalQty += qty;
+      totalAmount += subtotal;
+    }
+  }
+
+  if (rows.length === 0) {
+    setStatusBar('❌ 無有效明細可匯出', 'error');
+    return;
+  }
+
+  // 加合計列
+  rows.push({
+    '單號':     '【合計】',
+    '店家':     '',
+    '訂單日':   '',
+    '出貨日':   '',
+    '商品編號': '',
+    '商品名稱': validOrderCount + ' 張單，' + (rows.length) + ' 筆明細',
+    '數量':     totalQty,
+    '單價':     '',
+    '小計':     totalAmount,
+    '訂單狀態': '',
+    '退貨狀態': ''
+  });
+
+  // 產生 workbook
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // 欄寬
+  ws['!cols'] = [
+    { wch: 18 }, // 單號
+    { wch: 8 },  // 店家
+    { wch: 12 }, // 訂單日
+    { wch: 12 }, // 出貨日
+    { wch: 12 }, // 商品編號
+    { wch: 32 }, // 商品名稱
+    { wch: 6 },  // 數量
+    { wch: 8 },  // 單價
+    { wch: 10 }, // 小計
+    { wch: 10 }, // 訂單狀態
+    { wch: 10 }  // 退貨狀態
+  ];
+  // 強制單號（A 欄）+ 商品編號（E 欄）為文字格式（避免長數字變科學記號）
+  for (let r = 2; r <= rows.length + 1; r++) {
+    const cellA = ws['A' + r];
+    if (cellA) { cellA.t = 's'; cellA.z = '@'; }
+    const cellE = ws['E' + r];
+    if (cellE) { cellE.t = 's'; cellE.z = '@'; }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '銷貨單明細');
+
+  const now = new Date();
+  const filename = '銷貨單_'
+    + now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate())
+    + '-' + pad2(now.getHours()) + pad2(now.getMinutes())
+    + '.xlsx';
+  XLSX.writeFile(wb, filename);
+
+  setStatusBar('✅ 已匯出 ' + filename + '（' + validOrderCount + ' 張單，' + (rows.length - 1) + ' 筆明細）', 'success');
 }
 
 function doReset() {
@@ -420,8 +546,9 @@ function formatTs(ts) {
   // 查詢 / 重設
   document.getElementById('btn-search').addEventListener('click', doSearch);
   document.getElementById('btn-reset').addEventListener('click', doReset);
-  // 批次列印
+  // 批次列印 + Excel 匯出
   document.getElementById('btn-batch-print').addEventListener('click', doBatchPrint);
+  document.getElementById('btn-export-excel').addEventListener('click', doExportExcel);
   // 單號搜尋按 Enter
   document.getElementById('filter-search').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
