@@ -68,16 +68,7 @@ function renderPage(entry) {
   html += '<div class="row"><span class="label">出貨日：</span><span>' + (o.delivery_date || '-') + '</span></div>';
   html += '</div>';
 
-  // 狀態
-  html += '<div class="print-status-row">';
-  html += '<span class="status-tag ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span>';
-  if (o.has_return) {
-    html += '<span class="status-tag s-issue">⚠️ 退貨：' + escHtml(o.return_status) + '</span>';
-  }
-  if (o.received_at) {
-    html += '<span style="color:#2e7d32;">✅ 收貨：' + formatTs(o.received_at) + '</span>';
-  }
-  html += '</div>';
+  // 狀態列（簡化：拿掉「已建單」「退貨：申請中」徽章 — 由訂單列表/網站顯示即可）
 
   // 明細
   html += '<table class="print-table">';
@@ -129,10 +120,7 @@ function renderPage(entry) {
     html += '</div>';
   }
 
-  // 頁尾（簡化版：只留撿貨員 + 建單時間，簽名區拿掉）
-  html += '<div class="print-footer">';
-  html += '<div>撿貨員：' + escHtml(o.picker_email || '-') + '　／　建單時間：' + (o.created_at ? formatTs(o.created_at) : '-') + '</div>';
-  html += '</div>';
+  // 頁尾簡化：撿貨員 + 建單時間都拿掉
 
   html += '</div>';
   return html;
