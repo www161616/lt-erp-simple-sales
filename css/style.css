@@ -397,6 +397,15 @@ body {
 .b-issued   { background: #e3f2fd; color: #1565c0; }
 .b-received { background: #e8f5e9; color: #2e7d32; }
 .b-issue    { background: #ffebee; color: #c62828; }
+.b-draft    { background: #fff8e1; color: #e65100; border: 1px solid #ffb300; }
+
+/* 任務 4.1 D 段：暫存單列底色淡黃 */
+.orders-table tr.draft-row {
+  background: #fffbeb;
+}
+.orders-table tr.draft-row:hover {
+  background: #fff5d6;
+}
 
 
 /* ============================================================
@@ -530,3 +539,17 @@ body {
   padding: 40px;
   color: #1976d2;
 }
+
+/* 任務 4.1 D 段：暫存單 modal 警示框 */
+.draft-warn {
+  background: #fff8e1;
+  border: 2px solid #ffa000;
+  color: #bf360c;
+  padding: 12px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.draft-warn b { color: #d84315; }
+.draft-warn small { color: #6d4c41; }

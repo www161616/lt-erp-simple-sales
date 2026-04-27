@@ -19,6 +19,30 @@ function enterMain(user) {
   document.getElementById('current-user').textContent = user.email + ' (' + user.role + ')';
   showView('main');
   populateStoreSelect();
+
+  // ⚡ deep link：?order=SS-XXX → 自動帶入搜尋 + 直接開明細 modal
+  var urlOrder = '';
+  try {
+    urlOrder = (new URLSearchParams(window.location.search)).get('order') || '';
+  } catch (e) { /* 舊瀏覽器 fallback：略 */ }
+
+  if (urlOrder && urlOrder.indexOf('SS-') === 0) {
+    // 把搜尋 filter 設成該單號，日期不限（讓清單也找得到）
+    document.getElementById('filter-search').value = urlOrder;
+    document.getElementById('filter-from').value = '';
+    document.getElementById('filter-to').value   = '';
+    // 清掉「今日」按鈕的 active
+    var btns = document.querySelectorAll('.quick-buttons button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+
+    // 列表跑背景，立即開 modal
+    doSearch();
+    openDetailModal(urlOrder);
+    // 清掉 URL 參數，避免 reload 又自動開
+    try { history.replaceState({}, '', window.location.pathname); } catch (e) {}
+    return;
+  }
+
   applyDateRange('today');
   doSearch();
 }
@@ -108,14 +132,30 @@ async function doSearch() {
   try {
     const filters = getCurrentFilters();
     const rows = await ltGetAllOrders(filters);
-    const arr = Array.isArray(rows) ? rows : [];
+    let arr = Array.isArray(rows) ? rows : [];
+
+    // ⚡ 任務 4.1 D 段：status filter 為空時排除暫存單（is_draft=true）
+    //   要看暫存單必須明確選「📝 暫存」（後端 status='暫存' 自動只回暫存）
+    let draftHiddenCount = 0;
+    if (!filters.status) {
+      const before = arr.length;
+      arr = arr.filter(o => !o.is_draft);
+      draftHiddenCount = before - arr.length;
+    }
 
     if (arr.length === 0) {
-      setStatusBar('共 0 筆（無符合資料）', 'info');
+      const suffix = draftHiddenCount > 0
+        ? '（已隱藏 ' + draftHiddenCount + ' 張暫存單，要看請選狀態「📝 暫存」）'
+        : '（無符合資料）';
+      setStatusBar('共 0 筆 ' + suffix, 'info');
     } else if (arr.length >= 1000) {
       setStatusBar('共 ' + arr.length + ' 筆（已達上限 1000，建議縮小篩選範圍）', 'warning');
     } else {
-      setStatusBar('共 ' + arr.length + ' 筆', 'success');
+      let msg = '共 ' + arr.length + ' 筆';
+      if (draftHiddenCount > 0) {
+        msg += '（另有 ' + draftHiddenCount + ' 張暫存單已隱藏，要看請選狀態「📝 暫存」）';
+      }
+      setStatusBar(msg, 'success');
     }
     renderOrders(arr);
   } catch (err) {
@@ -142,20 +182,30 @@ function renderOrders(orders) {
   let html = '';
   for (let i = 0; i < orders.length; i++) {
     const o = orders[i];
-    html += '<tr>';
+    const isDraft = !!o.is_draft;
+    const rowClass = isDraft ? ' class="draft-row"' : '';
+    html += '<tr' + rowClass + '>';
     html += '<td><a data-order="' + escAttr(o.order_no) + '" class="order-link">' + escHtml(o.order_no) + '</a></td>';
     html += '<td>' + escHtml(o.store_name) + '</td>';
     html += '<td>' + (o.order_date    || '') + '</td>';
     html += '<td>' + (o.delivery_date || '') + '</td>';
     html += '<td class="r">' + (o.total_qty || 0) + '</td>';
     html += '<td class="r">$' + (Number(o.total_amount) || 0).toLocaleString() + '</td>';
-    html += '<td><span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span></td>';
+    if (isDraft) {
+      html += '<td><span class="badge b-draft">📝 暫存</span></td>';
+    } else {
+      html += '<td><span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span></td>';
+    }
     if (o.has_return) {
       html += '<td><span class="badge ' + returnClass(o.return_status) + '">' + escHtml(o.return_status) + '</span></td>';
     } else {
       html += '<td><small style="color:#999;">-</small></td>';
     }
-    html += '<td class="c"><button class="btn-mini" disabled title="D 段開放">📄</button></td>';
+    if (isDraft) {
+      html += '<td class="c"><button class="btn-mini" disabled title="暫存單不可列印">🚫</button></td>';
+    } else {
+      html += '<td class="c"><button class="btn-mini" disabled title="D 段開放">📄</button></td>';
+    }
     html += '</tr>';
   }
   tbody.innerHTML = html;
@@ -194,10 +244,15 @@ function closeDetailModal() {
 function renderModalBody(data) {
   const o = (data && data.order) || {};
   const items = (data && data.items) || [];
+  const isDraft = !!o.is_draft;
   let html = '';
 
   html += '<h2 class="modal-title">' + escHtml(o.order_no) + ' / ' + escHtml(o.store_name);
-  html += '<span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span>';
+  if (isDraft) {
+    html += '<span class="badge b-draft">📝 暫存</span>';
+  } else {
+    html += '<span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span>';
+  }
   html += '</h2>';
 
   html += '<div class="modal-meta">';
@@ -209,6 +264,15 @@ function renderModalBody(data) {
   if (o.received_at) html += '<span>✅ 收貨：' + formatTs(o.received_at) + '</span>';
   if (o.has_return) html += '<span class="return-badge">⚠️ 退貨：' + escHtml(o.return_status) + '</span>';
   html += '</div>';
+
+  // ⚡ 任務 4.1 D 段：暫存單警示框
+  if (isDraft) {
+    html += '<div class="draft-warn">';
+    html +=   '<b>⚠️ 此單為暫存單，數量與品項仍可能調整</b><br/>';
+    html +=   '尚未由撿貨員確認送出，<b>不會出現在店家「待收貨」清單</b>，也不能列印。<br/>';
+    html +=   '<small>要修改／確認送出 → 請到 16staff 撿貨員 Sheet「📝 暫存銷貨單」分頁處理</small>';
+    html += '</div>';
+  }
 
   if (items.length === 0) {
     html += '<div class="status-bar status-warning">⚠️ 無明細</div>';
@@ -243,7 +307,11 @@ function renderModalBody(data) {
   }
 
   html += '<div class="modal-actions">';
-  html += '<button class="btn-disabled" disabled title="D 段開放">📄 列印此單（D 段開放）</button>';
+  if (isDraft) {
+    html += '<button class="btn-disabled" disabled title="暫存單不可列印">🚫 暫存單不可列印</button>';
+  } else {
+    html += '<button class="btn-disabled" disabled title="任務 4 D 段列印開放">📄 列印此單（任務 4 D 段開放）</button>';
+  }
   html += '<button class="btn-secondary" id="btn-close-modal-bottom">✕ 關閉</button>';
   html += '</div>';
 
