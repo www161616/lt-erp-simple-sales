@@ -204,7 +204,7 @@ function doBatchPrint() {
   }
   // 確認彈窗（10 張以上才問，避免 admin 點按鈕後又被打斷）
   if (orders.length >= 10) {
-    if (!confirm('確定要列印 ' + orders.length + ' 張銷貨單？\n\n會在新分頁開啟列印頁，每張單獨立 A5 一頁。')) {
+    if (!confirm('確定要列印 ' + orders.length + ' 張銷貨單？\n\n會在新分頁開啟列印頁，每張單獨立 A4 一頁。')) {
       return;
     }
   }
