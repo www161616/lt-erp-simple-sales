@@ -34,12 +34,16 @@
         <h1>📋 簡易銷貨單</h1>
       </div>
       <div class="topbar-right">
+        <button type="button" id="btn-toggle-report" class="btn-secondary">📊 月結報表</button>
         <span id="current-user"></span>
         <button id="logout-btn" class="btn-secondary">登出</button>
       </div>
     </header>
 
     <main id="main-content">
+
+      <!-- 訂單列表 view -->
+      <div id="orders-view">
 
       <!-- 篩選 bar -->
       <section class="filter-bar">
@@ -123,6 +127,127 @@
           </tbody>
         </table>
       </section>
+      </div><!-- /orders-view -->
+
+      <!-- 月結報表 view -->
+      <div id="report-view" style="display:none;">
+        <section class="filter-bar">
+          <div class="filter-row">
+            <span class="filter-group">
+              <label>月份</label>
+              <select id="report-month"></select>
+            </span>
+            <span class="filter-actions">
+              <button type="button" id="btn-report-refresh" class="btn-primary">🔍 查詢</button>
+              <button type="button" id="btn-report-excel" class="btn-secondary" style="display:none;">📊 匯出彙總 Excel</button>
+            </span>
+          </div>
+        </section>
+
+        <div class="status-row">
+          <div id="report-status" class="status-bar" style="display:none;"></div>
+        </div>
+
+        <section class="orders-card">
+          <table class="orders-table report-table">
+            <thead>
+              <tr>
+                <th>店家</th>
+                <th class="r">銷貨筆數</th>
+                <th class="r">銷貨金額</th>
+                <th class="r">退貨筆數</th>
+                <th class="r">退貨金額</th>
+                <th class="r">月費</th>
+                <th class="r">店轉店淨額</th>
+                <th class="r">本月應收</th>
+              </tr>
+            </thead>
+            <tbody id="report-tbody">
+              <tr><td colspan="8" class="empty">請選擇月份後按「查詢」</td></tr>
+            </tbody>
+            <tfoot id="report-tfoot" style="display:none;">
+              <tr class="total-row">
+                <th>合計</th>
+                <th class="r" id="total-sales-cnt">0</th>
+                <th class="r" id="total-sales">$0</th>
+                <th class="r" id="total-returns-cnt">0</th>
+                <th class="r" id="total-returns">$0</th>
+                <th class="r" id="total-fee">$0</th>
+                <th class="r" id="total-transfer">$0</th>
+                <th class="r" id="total-net">$0</th>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+
+        <p class="report-hint">
+          💡 點任何一家店的店名 → 進入該店該月明細（可列印 / 匯出 Excel）。月費欄可直接編輯，按 <kbd>Enter</kbd> 或失焦自動儲存。
+        </p>
+      </div><!-- /report-view -->
+
+      <!-- 店家明細 view -->
+      <div id="store-detail-view" style="display:none;">
+        <section class="filter-bar">
+          <div class="filter-row">
+            <span class="filter-actions">
+              <button type="button" id="btn-detail-back" class="btn-secondary">← 返回彙總</button>
+            </span>
+            <span class="filter-group">
+              <label>店家對帳</label>
+              <h2 id="detail-title" style="margin:0;font-size:18px;color:#1565c0;">—</h2>
+            </span>
+            <span class="filter-actions" style="margin-left:auto;">
+              <button type="button" id="btn-detail-print" class="btn-secondary">🖨️ 列印</button>
+              <button type="button" id="btn-detail-excel" class="btn-secondary">📊 匯出 Excel</button>
+            </span>
+          </div>
+        </section>
+
+        <div class="status-row">
+          <div id="detail-status" class="status-bar" style="display:none;"></div>
+        </div>
+
+        <section class="orders-card">
+          <table class="orders-table detail-table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>單號</th>
+                <th>類型</th>
+                <th class="r">件數</th>
+                <th class="r">銷貨金額</th>
+                <th class="r">退貨金額</th>
+                <th class="r">淨額</th>
+              </tr>
+            </thead>
+            <tbody id="detail-tbody">
+              <tr><td colspan="7" class="empty">⏳ 載入中...</td></tr>
+            </tbody>
+            <tfoot id="detail-tfoot" style="display:none;">
+              <tr class="subtotal-row">
+                <th colspan="3">明細小計</th>
+                <th class="r" id="detail-sub-qty">0</th>
+                <th class="r" id="detail-sub-sales">$0</th>
+                <th class="r" id="detail-sub-returns">$0</th>
+                <th class="r" id="detail-sub-net">$0</th>
+              </tr>
+              <tr class="addon-row">
+                <th colspan="6">＋ 月費</th>
+                <th class="r" id="detail-fee">$0</th>
+              </tr>
+              <tr class="addon-row">
+                <th colspan="6">＋ 店轉店淨額（v2 接入）</th>
+                <th class="r" id="detail-transfer">$0</th>
+              </tr>
+              <tr class="total-row">
+                <th colspan="6">本月應收</th>
+                <th class="r" id="detail-grand-net">$0</th>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+      </div><!-- /store-detail-view -->
+
     </main>
   </div>
 

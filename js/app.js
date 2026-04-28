@@ -727,6 +727,553 @@ function formatTs(ts) {
 
 
 // ============================================================
+// 月結報表
+// ============================================================
+
+let _lastReportRows = [];   // 給 Excel 匯出用
+let _lastReportMonth = '';  // 'YYYY-MM'
+
+function toggleMainView(viewName) {
+  // 'orders' / 'report' / 'detail'
+  const ordersView = document.getElementById('orders-view');
+  const reportView = document.getElementById('report-view');
+  const detailView = document.getElementById('store-detail-view');
+  const btn = document.getElementById('btn-toggle-report');
+
+  ordersView.style.display = 'none';
+  reportView.style.display = 'none';
+  detailView.style.display = 'none';
+
+  if (viewName === 'report') {
+    reportView.style.display = '';
+    btn.textContent = '📋 訂單列表';
+    if (!document.getElementById('report-month').options.length) {
+      populateMonthSelect();
+    }
+    if (!_lastReportMonth) {
+      loadMonthlyReport();
+    }
+  } else if (viewName === 'detail') {
+    detailView.style.display = '';
+    btn.textContent = '📋 訂單列表';
+  } else {
+    ordersView.style.display = '';
+    btn.textContent = '📊 月結報表';
+  }
+}
+
+function populateMonthSelect() {
+  const sel = document.getElementById('report-month');
+  // 從 2026-04 到當月
+  const start = { y: 2026, m: 4 };
+  const today = new Date();
+  const end = { y: today.getFullYear(), m: today.getMonth() + 1 };
+
+  const months = [];
+  let y = start.y, m = start.m;
+  while (y < end.y || (y === end.y && m <= end.m)) {
+    months.push(y + '-' + pad2(m));
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+
+  // 倒序：新到舊
+  months.reverse();
+  sel.innerHTML = '';
+  for (let i = 0; i < months.length; i++) {
+    const opt = document.createElement('option');
+    opt.value = months[i];
+    opt.textContent = months[i];
+    sel.appendChild(opt);
+  }
+  // 預設當月
+  sel.value = months[0];
+}
+
+async function loadMonthlyReport() {
+  const sel = document.getElementById('report-month');
+  const yearMonth = sel.value;
+  if (!yearMonth) return;
+
+  const tbody = document.getElementById('report-tbody');
+  const tfoot = document.getElementById('report-tfoot');
+  const statusEl = document.getElementById('report-status');
+  const btnExcel = document.getElementById('btn-report-excel');
+
+  tbody.innerHTML = '<tr><td colspan="6" class="empty">⏳ 載入中...</td></tr>';
+  tfoot.style.display = 'none';
+  btnExcel.style.display = 'none';
+  _lastReportRows = [];
+
+  statusEl.className = 'status-bar status-info';
+  statusEl.textContent = '查詢 ' + yearMonth + '...';
+  statusEl.style.display = '';
+
+  try {
+    const rows = await ltGetMonthlySummary(yearMonth);
+    // race guard：admin 快速切月份時，較慢回來的舊請求不該覆蓋畫面
+    if (document.getElementById('report-month').value !== yearMonth) return;
+    _lastReportRows = Array.isArray(rows) ? rows : [];
+    _lastReportMonth = yearMonth;
+    renderReportTable(_lastReportRows);
+    statusEl.className = 'status-bar status-success';
+    statusEl.textContent = '✅ ' + yearMonth + ' 月結 — 共 ' + _lastReportRows.length + ' 家店';
+    btnExcel.style.display = '';
+  } catch (err) {
+    // 同樣的 race guard：err 是慢回來的也不該蓋掉現在的畫面
+    if (document.getElementById('report-month').value !== yearMonth) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">查詢失敗</td></tr>';
+    statusEl.className = 'status-bar status-error';
+    statusEl.textContent = '❌ 查詢失敗：' + err.message;
+  }
+}
+
+function renderReportTable(rows) {
+  const tbody = document.getElementById('report-tbody');
+  const tfoot = document.getElementById('report-tfoot');
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">無資料</td></tr>';
+    tfoot.style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0;
+  let totSalesCnt = 0, totReturnsCnt = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const sales = Number(r.sales_amount) || 0;
+    const returns = Number(r.returns_amount) || 0;
+    const fee = Number(r.monthly_fee) || 0;
+    const transfer = Number(r.transfer_net) || 0;
+    const net = Number(r.net_amount) || 0;
+    const salesCnt = Number(r.sales_count) || 0;
+    const returnsCnt = Number(r.returns_count) || 0;
+
+    totSales += sales;
+    totReturns += returns;
+    totFee += fee;
+    totTransfer += transfer;
+    totSalesCnt += salesCnt;
+    totReturnsCnt += returnsCnt;
+
+    const returnsCls = returns > 0 ? ' class="negative"' : '';
+    const netCls = net < 0 ? ' class="negative"' : '';
+    const netStr = net < 0
+      ? '-$' + Math.abs(net).toLocaleString()
+      : '$' + net.toLocaleString();
+
+    html += '<tr>';
+    html += '<td><a class="store-link" data-store="' + escAttr(r.store_name) + '">'
+         + escHtml(r.store_name) + '</a></td>';
+    html += '<td class="r">' + salesCnt + '</td>';
+    html += '<td class="r">$' + sales.toLocaleString() + '</td>';
+    html += '<td class="r">' + returnsCnt + '</td>';
+    html += '<td class="r"' + returnsCls + '>'
+         + (returns > 0 ? '-$' + returns.toLocaleString() : '$0')
+         + '</td>';
+    // 月費欄：可編輯 input + 💾
+    html += '<td class="r">'
+         + '<input type="number" class="fee-input" data-store="' + escAttr(r.store_name) + '" '
+         + 'value="' + fee + '" min="0" step="100" />'
+         + '<button type="button" class="btn-fee-save" data-store="' + escAttr(r.store_name) + '" title="儲存">💾</button>'
+         + '</td>';
+    // 店轉店淨額：v1 固定 0 灰字
+    html += '<td class="r"><span class="placeholder-cell" title="任務 6 完成後接入">$0</span></td>';
+    html += '<td class="r"' + netCls + '><b>' + netStr + '</b></td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+
+  // 合計
+  const totNet = totSales - totReturns + totFee + totTransfer;
+  document.getElementById('total-sales-cnt').textContent = totSalesCnt;
+  document.getElementById('total-sales').textContent = '$' + totSales.toLocaleString();
+  document.getElementById('total-returns-cnt').textContent = totReturnsCnt;
+  document.getElementById('total-returns').textContent = totReturns > 0
+    ? '-$' + totReturns.toLocaleString()
+    : '$0';
+  document.getElementById('total-fee').textContent = '$' + totFee.toLocaleString();
+  document.getElementById('total-transfer').textContent = '$' + totTransfer.toLocaleString();
+  document.getElementById('total-net').textContent = totNet < 0
+    ? '-$' + Math.abs(totNet).toLocaleString()
+    : '$' + totNet.toLocaleString();
+  tfoot.style.display = '';
+
+  // 綁事件：店名點擊進明細 / 月費編輯
+  const storeLinks = tbody.querySelectorAll('.store-link');
+  for (let i = 0; i < storeLinks.length; i++) {
+    storeLinks[i].addEventListener('click', function () {
+      openStoreDetail(this.dataset.store);
+    });
+  }
+  const feeInputs = tbody.querySelectorAll('.fee-input');
+  for (let i = 0; i < feeInputs.length; i++) {
+    feeInputs[i].addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveFee(this.dataset.store, this.value); }
+    });
+    feeInputs[i].addEventListener('blur', function () {
+      // blur 不自動存（避免 click 💾 同時觸發）
+    });
+  }
+  const saveBtns = tbody.querySelectorAll('.btn-fee-save');
+  for (let i = 0; i < saveBtns.length; i++) {
+    saveBtns[i].addEventListener('click', function () {
+      const store = this.dataset.store;
+      const input = tbody.querySelector('.fee-input[data-store="' + store + '"]');
+      saveFee(store, input.value);
+    });
+  }
+}
+
+async function saveFee(storeName, feeValue) {
+  const fee = Number(feeValue);
+  if (isNaN(fee) || fee < 0) {
+    alert('月費必須是 0 以上的數字');
+    return;
+  }
+  const statusEl = document.getElementById('report-status');
+  statusEl.className = 'status-bar status-info';
+  statusEl.textContent = '儲存 ' + storeName + ' 月費：$' + fee + '...';
+  statusEl.style.display = '';
+  try {
+    await ltUpdateStoreMonthlyFee(storeName, fee);
+    statusEl.className = 'status-bar status-success';
+    statusEl.textContent = '✅ ' + storeName + ' 月費已存為 $' + fee + '，重新整理彙總表...';
+    // 重新 load 報表（淨應收會跟著重算）
+    await loadMonthlyReport();
+  } catch (err) {
+    statusEl.className = 'status-bar status-error';
+    statusEl.textContent = '❌ 儲存失敗：' + err.message;
+  }
+}
+
+
+// ============================================================
+// 店家明細頁
+// ============================================================
+
+let _lastDetailRows = [];
+let _lastDetailStore = '';
+let _lastDetailMonth = '';
+let _lastDetailFee = 0;
+let _lastDetailTransfer = 0;
+
+async function openStoreDetail(storeName) {
+  _lastDetailStore = storeName;
+  _lastDetailMonth = _lastReportMonth;
+  document.getElementById('detail-title').textContent =
+    storeName + '  ｜  ' + _lastReportMonth;
+  toggleMainView('detail');
+
+  const tbody = document.getElementById('detail-tbody');
+  const tfoot = document.getElementById('detail-tfoot');
+  const statusEl = document.getElementById('detail-status');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty">⏳ 載入中...</td></tr>';
+  tfoot.style.display = 'none';
+  statusEl.className = 'status-bar status-info';
+  statusEl.textContent = '查詢 ' + storeName + ' ' + _lastReportMonth + ' 明細...';
+  statusEl.style.display = '';
+
+  // 從彙總列拿月費 / 店轉店（避免再 fetch）
+  const summaryRow = (_lastReportRows || []).find(r => r.store_name === storeName) || {};
+  _lastDetailFee = Number(summaryRow.monthly_fee) || 0;
+  _lastDetailTransfer = Number(summaryRow.transfer_net) || 0;
+
+  try {
+    const rows = await ltGetStoreMonthlyDetail(storeName, _lastReportMonth);
+    // race guard
+    if (_lastDetailStore !== storeName || _lastDetailMonth !== _lastReportMonth) return;
+    _lastDetailRows = Array.isArray(rows) ? rows : [];
+    renderDetailTable();
+    statusEl.className = 'status-bar status-success';
+    statusEl.textContent = '✅ ' + storeName + ' ' + _lastReportMonth + ' 明細 — 共 ' + _lastDetailRows.length + ' 筆';
+  } catch (err) {
+    if (_lastDetailStore !== storeName || _lastDetailMonth !== _lastReportMonth) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">查詢失敗</td></tr>';
+    statusEl.className = 'status-bar status-error';
+    statusEl.textContent = '❌ ' + err.message;
+  }
+}
+
+function renderDetailTable() {
+  const tbody = document.getElementById('detail-tbody');
+  const tfoot = document.getElementById('detail-tfoot');
+  const rows = _lastDetailRows;
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">該店該月無資料</td></tr>';
+    // 仍顯示 footer（可能只有月費）
+  }
+
+  let html = '';
+  let subQty = 0, subSales = 0, subReturns = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const qty = Number(r.total_qty) || 0;
+    const sales = Number(r.sales_amount) || 0;
+    const returns = Number(r.returns_amount) || 0;
+    const net = Number(r.net_amount) || 0;
+    subQty += qty;
+    subSales += sales;
+    subReturns += returns;
+
+    const dataType = r.data_type || 'simple';
+    let typeBadge = '';
+    if (dataType === 'simple')              typeBadge = '<span class="badge b-simple">📦 一般</span>';
+    else if (dataType === 'legacy_normal')  typeBadge = '<span class="badge b-legacy">📜 歷史</span>';
+    else                                    typeBadge = '<span class="badge b-legacy-return">📜 歷史退貨</span>';
+
+    const returnsCls = returns > 0 ? ' class="r negative"' : ' class="r"';
+    const netCls = net < 0 ? ' class="r negative"' : ' class="r"';
+    const netStr = net < 0
+      ? '-$' + Math.abs(net).toLocaleString()
+      : '$' + net.toLocaleString();
+
+    html += '<tr>';
+    html += '<td>' + (r.order_date || '-') + '</td>';
+    html += '<td class="mono">' + escHtml(r.order_no) + '</td>';
+    html += '<td>' + typeBadge + '</td>';
+    html += '<td class="r">' + qty + '</td>';
+    html += '<td class="r">' + (sales > 0 ? '$' + sales.toLocaleString() : '-') + '</td>';
+    html += '<td' + returnsCls + '>' + (returns > 0 ? '-$' + returns.toLocaleString() : '-') + '</td>';
+    html += '<td' + netCls + '><b>' + netStr + '</b></td>';
+    html += '</tr>';
+  }
+  if (rows.length > 0) tbody.innerHTML = html;
+
+  // 小計 + 月費 + 店轉店 + 應收
+  const subNet = subSales - subReturns;
+  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer;
+  document.getElementById('detail-sub-qty').textContent = subQty;
+  document.getElementById('detail-sub-sales').textContent = '$' + subSales.toLocaleString();
+  document.getElementById('detail-sub-returns').textContent = subReturns > 0
+    ? '-$' + subReturns.toLocaleString()
+    : '$0';
+  document.getElementById('detail-sub-net').textContent = subNet < 0
+    ? '-$' + Math.abs(subNet).toLocaleString()
+    : '$' + subNet.toLocaleString();
+  document.getElementById('detail-fee').textContent = '$' + _lastDetailFee.toLocaleString();
+  document.getElementById('detail-transfer').textContent = '$' + _lastDetailTransfer.toLocaleString();
+  document.getElementById('detail-grand-net').textContent = grandNet < 0
+    ? '-$' + Math.abs(grandNet).toLocaleString()
+    : '$' + grandNet.toLocaleString();
+  tfoot.style.display = '';
+}
+
+function exportDetailExcel() {
+  if (!_lastDetailRows || !_lastDetailStore) {
+    alert('沒有資料可匯出');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('XLSX library 未載入，請重整頁面再試');
+    return;
+  }
+
+  const rows = [];
+  let subQty = 0, subSales = 0, subReturns = 0;
+  for (let i = 0; i < _lastDetailRows.length; i++) {
+    const r = _lastDetailRows[i];
+    const qty = Number(r.total_qty) || 0;
+    const sales = Number(r.sales_amount) || 0;
+    const returns = Number(r.returns_amount) || 0;
+    const net = Number(r.net_amount) || 0;
+    subQty += qty;
+    subSales += sales;
+    subReturns += returns;
+
+    let typeText = '一般';
+    if (r.data_type === 'legacy_normal')      typeText = '歷史';
+    else if (r.data_type === 'legacy_return') typeText = '歷史退貨';
+
+    rows.push({
+      '日期':     r.order_date || '',
+      '單號':     r.order_no || '',
+      '類型':     typeText,
+      '件數':     qty,
+      '銷貨金額': sales,
+      '退貨金額': returns,
+      '淨額':     net
+    });
+  }
+  // 小計、月費、店轉店、應收
+  rows.push({ '日期': '【明細小計】', '單號': '', '類型': '', '件數': subQty, '銷貨金額': subSales, '退貨金額': subReturns, '淨額': subSales - subReturns });
+  rows.push({ '日期': '＋月費',        '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailFee });
+  rows.push({ '日期': '＋店轉店淨額',  '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailTransfer });
+  rows.push({ '日期': '【本月應收】',  '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': (subSales - subReturns) + _lastDetailFee + _lastDetailTransfer });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 18 }, { wch: 10 },
+    { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
+  ];
+  // 單號欄文字格式
+  for (let r = 2; r <= rows.length + 1; r++) {
+    const cellB = ws['B' + r];
+    if (cellB) { cellB.t = 's'; cellB.z = '@'; }
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, _lastDetailStore + ' ' + _lastDetailMonth);
+
+  const filename = '月結_' + _lastDetailStore + '_' + _lastDetailMonth + '.xlsx';
+  XLSX.writeFile(wb, filename);
+}
+
+function printStoreDetail() {
+  if (!_lastDetailRows || !_lastDetailStore) {
+    alert('沒有資料可列印');
+    return;
+  }
+
+  const rows = _lastDetailRows;
+  let subQty = 0, subSales = 0, subReturns = 0;
+  let bodyHtml = '';
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const qty = Number(r.total_qty) || 0;
+    const sales = Number(r.sales_amount) || 0;
+    const returns = Number(r.returns_amount) || 0;
+    const net = Number(r.net_amount) || 0;
+    subQty += qty;
+    subSales += sales;
+    subReturns += returns;
+
+    let typeText = '一般';
+    if (r.data_type === 'legacy_normal')      typeText = '歷史';
+    else if (r.data_type === 'legacy_return') typeText = '歷史退貨';
+
+    bodyHtml += '<tr>';
+    bodyHtml += '<td>' + (r.order_date || '-') + '</td>';
+    bodyHtml += '<td class="mono">' + escHtml(r.order_no) + '</td>';
+    bodyHtml += '<td>' + typeText + '</td>';
+    bodyHtml += '<td class="r">' + qty + '</td>';
+    bodyHtml += '<td class="r">' + (sales > 0 ? '$' + sales.toLocaleString() : '-') + '</td>';
+    bodyHtml += '<td class="r' + (returns > 0 ? ' negative' : '') + '">' + (returns > 0 ? '-$' + returns.toLocaleString() : '-') + '</td>';
+    bodyHtml += '<td class="r' + (net < 0 ? ' negative' : '') + '"><b>' + (net < 0 ? '-$' + Math.abs(net).toLocaleString() : '$' + net.toLocaleString()) + '</b></td>';
+    bodyHtml += '</tr>';
+  }
+
+  const subNet = subSales - subReturns;
+  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer;
+  const html = ''
+    + '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'
+    + _lastDetailStore + ' ' + _lastDetailMonth + ' 月結對帳單</title>'
+    + '<style>'
+    + '@page { size: A4; margin: 10mm; }'
+    + 'body { font-family: "Microsoft JhengHei",sans-serif; font-size: 12px; color: #333; }'
+    + 'h1 { font-size: 20px; text-align: center; margin: 0; }'
+    + '.subtitle { text-align: center; font-size: 13px; color: #666; margin: 4px 0 16px; letter-spacing: 4px; }'
+    + 'table { width: 100%; border-collapse: collapse; }'
+    + 'th, td { border: 1px solid #999; padding: 6px 8px; }'
+    + 'th { background: #eee; }'
+    + '.r { text-align: right; }'
+    + '.mono { font-family: Consolas, monospace; }'
+    + '.negative { color: #c00; font-weight: bold; }'
+    + '.subtotal-row th { background: #f5f5f5; }'
+    + '.addon-row th { background: #fafafa; font-weight: normal; }'
+    + '.total-row th { background: #fff3e0; color: #b53400; font-size: 14px; }'
+    + '.print-actions { position: fixed; top: 8px; right: 8px; }'
+    + '.print-actions button { padding: 6px 14px; font-size: 13px; cursor: pointer; }'
+    + '@media print { .print-actions { display: none; } }'
+    + '</style></head><body>'
+    + '<div class="print-actions"><button onclick="window.print()">🖨️ 列印</button> <button onclick="window.close()">✕ 關閉</button></div>'
+    + '<h1>丸十水產股份有限公司</h1>'
+    + '<div class="subtitle">' + _lastDetailStore + ' ' + _lastDetailMonth + ' 月結對帳單</div>'
+    + '<table>'
+    +   '<thead><tr>'
+    +     '<th>日期</th><th>單號</th><th>類型</th>'
+    +     '<th class="r">件數</th><th class="r">銷貨金額</th><th class="r">退貨金額</th><th class="r">淨額</th>'
+    +   '</tr></thead>'
+    +   '<tbody>' + (bodyHtml || '<tr><td colspan="7" style="text-align:center;color:#999;">無資料</td></tr>') + '</tbody>'
+    +   '<tfoot>'
+    +     '<tr class="subtotal-row"><th colspan="3">明細小計</th>'
+    +       '<th class="r">' + subQty + '</th>'
+    +       '<th class="r">$' + subSales.toLocaleString() + '</th>'
+    +       '<th class="r' + (subReturns > 0 ? ' negative' : '') + '">' + (subReturns > 0 ? '-$' + subReturns.toLocaleString() : '$0') + '</th>'
+    +       '<th class="r">' + (subNet < 0 ? '-$' + Math.abs(subNet).toLocaleString() : '$' + subNet.toLocaleString()) + '</th>'
+    +     '</tr>'
+    +     '<tr class="addon-row"><th colspan="6">＋ 月費</th><th class="r">$' + _lastDetailFee.toLocaleString() + '</th></tr>'
+    +     '<tr class="addon-row"><th colspan="6">＋ 店轉店淨額（v2 接入）</th><th class="r">$' + _lastDetailTransfer.toLocaleString() + '</th></tr>'
+    +     '<tr class="total-row"><th colspan="6">本月應收</th>'
+    +       '<th class="r">' + (grandNet < 0 ? '-$' + Math.abs(grandNet).toLocaleString() : '$' + grandNet.toLocaleString()) + '</th>'
+    +     '</tr>'
+    +   '</tfoot>'
+    + '</table>'
+    + '<p style="margin-top:24px;font-size:11px;color:#666;">列印時間：' + new Date().toLocaleString('zh-TW') + '</p>'
+    + '</body></html>';
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
+
+function exportReportExcel() {
+  if (!_lastReportRows || _lastReportRows.length === 0) {
+    alert('沒有資料可匯出');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('XLSX library 未載入，請重整頁面再試');
+    return;
+  }
+
+  const rows = [];
+  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0;
+  let totSalesCnt = 0, totReturnsCnt = 0;
+  for (let i = 0; i < _lastReportRows.length; i++) {
+    const r = _lastReportRows[i];
+    const sales = Number(r.sales_amount) || 0;
+    const returns = Number(r.returns_amount) || 0;
+    const fee = Number(r.monthly_fee) || 0;
+    const transfer = Number(r.transfer_net) || 0;
+    const net = Number(r.net_amount) || 0;
+    const salesCnt = Number(r.sales_count) || 0;
+    const returnsCnt = Number(r.returns_count) || 0;
+    totSales += sales;
+    totReturns += returns;
+    totFee += fee;
+    totTransfer += transfer;
+    totSalesCnt += salesCnt;
+    totReturnsCnt += returnsCnt;
+    rows.push({
+      '店家':         r.store_name || '',
+      '銷貨筆數':     salesCnt,
+      '銷貨金額':     sales,
+      '退貨筆數':     returnsCnt,
+      '退貨金額':     returns,
+      '月費':         fee,
+      '店轉店淨額':   transfer,
+      '本月應收':     net
+    });
+  }
+  // 合計列
+  rows.push({
+    '店家':         '【合計】',
+    '銷貨筆數':     totSalesCnt,
+    '銷貨金額':     totSales,
+    '退貨筆數':     totReturnsCnt,
+    '退貨金額':     totReturns,
+    '月費':         totFee,
+    '店轉店淨額':   totTransfer,
+    '本月應收':     totSales - totReturns + totFee + totTransfer
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 },
+    { wch: 10 }, { wch: 12 }, { wch: 14 }
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, _lastReportMonth + ' 月結');
+
+  const filename = '月結報表_' + _lastReportMonth + '.xlsx';
+  XLSX.writeFile(wb, filename);
+}
+
+
+// ============================================================
 // 註冊事件
 // ============================================================
 
@@ -759,6 +1306,23 @@ function formatTs(ts) {
       if (modal && modal.style.display !== 'none') closeDetailModal();
     }
   });
+
+  // 月結報表切換按鈕
+  document.getElementById('btn-toggle-report').addEventListener('click', function () {
+    const reportView = document.getElementById('report-view');
+    const isReport = reportView.style.display !== 'none';
+    toggleMainView(isReport ? 'orders' : 'report');
+  });
+  // 月結報表 — 月份 / 查詢 / Excel
+  document.getElementById('btn-report-refresh').addEventListener('click', loadMonthlyReport);
+  document.getElementById('report-month').addEventListener('change', loadMonthlyReport);
+  document.getElementById('btn-report-excel').addEventListener('click', exportReportExcel);
+  // 店家明細 — 返回 / 列印 / Excel
+  document.getElementById('btn-detail-back').addEventListener('click', function () {
+    toggleMainView('report');
+  });
+  document.getElementById('btn-detail-print').addEventListener('click', printStoreDetail);
+  document.getElementById('btn-detail-excel').addEventListener('click', exportDetailExcel);
 })();
 
 

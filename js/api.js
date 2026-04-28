@@ -90,3 +90,41 @@ window.ltGetLegacyOrderDetails = async function (orderNo) {
     p_order_no:     orderNo
   });
 };
+
+
+// ============================================================
+// 月結報表（admin/JWT）
+// ============================================================
+
+// 取月結（每店：銷貨/退貨/月費/店轉店淨額/淨應收）
+//   yearMonth: 'YYYY-MM' 格式，例 '2026-04'
+window.ltGetMonthlySummary = async function (yearMonth) {
+  return await ltCallRpc('get_monthly_summary_admin', {
+    p_admin_secret: null,
+    p_year_month:   yearMonth
+  });
+};
+
+
+// 取單店明細（某店某月所有銷貨/退貨單）
+//   storeName: 短名（如 '三峽' / '平鎮' / '全民'）
+//   yearMonth: 'YYYY-MM'
+window.ltGetStoreMonthlyDetail = async function (storeName, yearMonth) {
+  return await ltCallRpc('get_store_monthly_detail_admin', {
+    p_admin_secret: null,
+    p_store_name:   storeName,
+    p_year_month:   yearMonth
+  });
+};
+
+
+// 更新某店月費（admin/JWT）
+//   storeName: 短名
+//   fee: 0 ~ N（不可負數）
+window.ltUpdateStoreMonthlyFee = async function (storeName, fee) {
+  return await ltCallRpc('update_store_monthly_fee_admin', {
+    p_admin_secret: null,
+    p_store_name:   storeName,
+    p_fee:          fee
+  });
+};

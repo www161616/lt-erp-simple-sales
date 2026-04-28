@@ -620,3 +620,143 @@ body {
   font-size: 13px;
   color: #555;
 }
+
+
+/* ============================================================
+   2026-04-30：月結報表
+   ============================================================ */
+
+/* topbar 切換按鈕（月結 / 列表）*/
+#btn-toggle-report {
+  background: #1565c0;
+  color: white;
+  font-weight: bold;
+}
+#btn-toggle-report:hover {
+  background: #0d47a1;
+}
+
+/* 月結表格 */
+.report-table th,
+.report-table td {
+  padding: 12px 14px;
+  font-size: 14px;
+}
+.report-table tbody tr:hover {
+  background: #f5f7fa;
+}
+
+/* 合計列 */
+.report-table tfoot .total-row {
+  background: #fff3e0;
+  border-top: 2px solid #fb8c00;
+  font-size: 15px;
+}
+.report-table tfoot .total-row th {
+  padding: 14px;
+  background: #fff3e0;
+  color: #bf360c;
+  border-bottom: 0;
+  position: static;
+}
+.report-table tfoot .total-row .negative {
+  color: #c62828;
+}
+
+/* 月份下拉樣式微調 */
+#report-month {
+  min-width: 120px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* 店名連結（彙總表）*/
+.store-link {
+  color: #1565c0;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: none;
+}
+.store-link:hover {
+  text-decoration: underline;
+}
+
+/* 月費 input + 儲存鈕 */
+.fee-input {
+  width: 80px;
+  padding: 3px 6px;
+  font-size: 13px;
+  text-align: right;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.fee-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+}
+.btn-fee-save {
+  background: transparent;
+  border: 0;
+  padding: 0 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-fee-save:hover { background: #e3f2fd; border-radius: 4px; }
+
+/* 店轉店淨額 placeholder（v1 灰字）*/
+.placeholder-cell {
+  color: #999;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* 報表頁底部提示 */
+.report-hint {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.report-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* 店家明細表 — footer 區塊 */
+.detail-table tfoot th {
+  padding: 10px 14px;
+  text-align: right;
+  position: static;
+  background: #fafafa;
+  border-top: 1px solid #e0e0e0;
+}
+.detail-table tfoot .subtotal-row th {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border-top: 2px solid #1976d2;
+}
+.detail-table tfoot .addon-row th {
+  background: #fafafa;
+  color: #555;
+  font-weight: normal;
+}
+.detail-table tfoot .total-row th {
+  background: #fff3e0;
+  color: #bf360c;
+  font-size: 15px;
+  border-top: 2px solid #fb8c00;
+}
+.detail-table tfoot th:first-child {
+  text-align: left;
+}
+.detail-table tfoot .negative {
+  color: #c62828;
+}
