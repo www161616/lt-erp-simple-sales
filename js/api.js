@@ -128,3 +128,21 @@ window.ltUpdateStoreMonthlyFee = async function (storeName, fee) {
     p_fee:          fee
   });
 };
+
+
+// 更新某店某月「店轉店」或「調整金額」(admin/JWT)
+//   storeName: 短名
+//   yearMonth: 'YYYY-MM'
+//   section:   'transfer' | 'adjustment'
+//   amount:    可正可負；NULL 視為 0
+//   note:      可空字串
+window.ltUpdateStoreMonthlyData = async function (storeName, yearMonth, section, amount, note) {
+  return await ltCallRpc('update_store_monthly_data_admin', {
+    p_admin_secret: null,
+    p_store_name:   storeName,
+    p_year_month:   yearMonth,
+    p_section:      section,
+    p_amount:       amount,
+    p_note:         note || ''
+  });
+};

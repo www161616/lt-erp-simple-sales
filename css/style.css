@@ -704,11 +704,54 @@ body {
 }
 .btn-fee-save:hover { background: #e3f2fd; border-radius: 4px; }
 
-/* 店轉店淨額 placeholder（v1 灰字）*/
+/* 店轉店淨額 placeholder（v1 灰字 — v3 後改成手動輸入，仍保留以防舊資料）*/
 .placeholder-cell {
   color: #999;
   font-style: italic;
   font-size: 12px;
+}
+
+/* 店轉店 / 調整金額 input + 備註 input */
+.amount-input {
+  width: 80px;
+  padding: 3px 6px;
+  font-size: 13px;
+  text-align: right;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.amount-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+}
+.note-input {
+  width: 140px;
+  padding: 3px 6px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.note-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+}
+.btn-section-save {
+  background: transparent;
+  border: 0;
+  padding: 0 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-section-save:hover { background: #e3f2fd; border-radius: 4px; }
+
+/* 店家明細 footer 的小備註灰字 */
+.detail-side-note {
+  color: #999;
+  font-size: 11px;
+  font-weight: normal;
+  margin-left: 8px;
 }
 
 /* 報表頁底部提示 */

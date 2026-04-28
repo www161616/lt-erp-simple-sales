@@ -159,11 +159,14 @@
                 <th class="r">退貨金額</th>
                 <th class="r">月費</th>
                 <th class="r">店轉店淨額</th>
+                <th>店轉店備註</th>
+                <th class="r">調整金額</th>
+                <th>調整備註</th>
                 <th class="r">本月應收</th>
               </tr>
             </thead>
             <tbody id="report-tbody">
-              <tr><td colspan="8" class="empty">請選擇月份後按「查詢」</td></tr>
+              <tr><td colspan="11" class="empty">請選擇月份後按「查詢」</td></tr>
             </tbody>
             <tfoot id="report-tfoot" style="display:none;">
               <tr class="total-row">
@@ -174,6 +177,9 @@
                 <th class="r" id="total-returns">$0</th>
                 <th class="r" id="total-fee">$0</th>
                 <th class="r" id="total-transfer">$0</th>
+                <th></th>
+                <th class="r" id="total-adjustment">$0</th>
+                <th></th>
                 <th class="r" id="total-net">$0</th>
               </tr>
             </tfoot>
@@ -181,7 +187,9 @@
         </section>
 
         <p class="report-hint">
-          💡 點任何一家店的店名 → 進入該店該月明細（可列印 / 匯出 Excel）。月費欄可直接編輯，按 <kbd>Enter</kbd> 或失焦自動儲存。
+          💡 點任何一家店的店名 → 進入該店該月明細（可列印 / 匯出 Excel）。<br>
+          <b>月費</b>：可直接編輯，按 Enter 或 💾 儲存。<br>
+          <b>店轉店淨額 / 調整金額</b>：可正可負（如 <code>-1985</code> 表示扣款），改完按 💾 儲存。各自獨立儲存，不會互相影響。
         </p>
       </div><!-- /report-view -->
 
@@ -236,8 +244,12 @@
                 <th class="r" id="detail-fee">$0</th>
               </tr>
               <tr class="addon-row">
-                <th colspan="6">＋ 店轉店淨額（v2 接入）</th>
+                <th colspan="6"><span id="detail-transfer-label">＋ 店轉店淨額</span></th>
                 <th class="r" id="detail-transfer">$0</th>
+              </tr>
+              <tr class="addon-row">
+                <th colspan="6"><span id="detail-adjustment-label">＋ 調整金額</span></th>
+                <th class="r" id="detail-adjustment">$0</th>
               </tr>
               <tr class="total-row">
                 <th colspan="6">本月應收</th>

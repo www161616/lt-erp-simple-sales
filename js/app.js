@@ -833,20 +833,23 @@ function renderReportTable(rows) {
   const tfoot = document.getElementById('report-tfoot');
 
   if (!rows || rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">無資料</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="empty">無資料</td></tr>';
     tfoot.style.display = 'none';
     return;
   }
 
   let html = '';
-  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0;
+  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0, totAdjustment = 0;
   let totSalesCnt = 0, totReturnsCnt = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     const sales = Number(r.sales_amount) || 0;
     const returns = Number(r.returns_amount) || 0;
     const fee = Number(r.monthly_fee) || 0;
-    const transfer = Number(r.transfer_net) || 0;
+    const transfer = Number(r.transfer_amount) || 0;
+    const transferNote = String(r.transfer_note || '');
+    const adjustment = Number(r.adjustment_amount) || 0;
+    const adjustmentNote = String(r.adjustment_note || '');
     const net = Number(r.net_amount) || 0;
     const salesCnt = Number(r.sales_count) || 0;
     const returnsCnt = Number(r.returns_count) || 0;
@@ -855,6 +858,7 @@ function renderReportTable(rows) {
     totReturns += returns;
     totFee += fee;
     totTransfer += transfer;
+    totAdjustment += adjustment;
     totSalesCnt += salesCnt;
     totReturnsCnt += returnsCnt;
 
@@ -877,17 +881,37 @@ function renderReportTable(rows) {
     html += '<td class="r">'
          + '<input type="number" class="fee-input" data-store="' + escAttr(r.store_name) + '" '
          + 'value="' + fee + '" min="0" step="100" />'
-         + '<button type="button" class="btn-fee-save" data-store="' + escAttr(r.store_name) + '" title="儲存">💾</button>'
+         + '<button type="button" class="btn-fee-save" data-store="' + escAttr(r.store_name) + '" title="儲存月費">💾</button>'
          + '</td>';
-    // 店轉店淨額：v1 固定 0 灰字
-    html += '<td class="r"><span class="placeholder-cell" title="任務 6 完成後接入">$0</span></td>';
+    // 店轉店淨額：可編輯 input（可正可負）
+    html += '<td class="r">'
+         + '<input type="number" class="amount-input transfer-input" data-store="' + escAttr(r.store_name) + '" '
+         + 'value="' + transfer + '" step="1" />'
+         + '<button type="button" class="btn-section-save btn-transfer-save" data-store="' + escAttr(r.store_name) + '" title="儲存店轉店">💾</button>'
+         + '</td>';
+    // 店轉店備註
+    html += '<td>'
+         + '<input type="text" class="note-input transfer-note-input" data-store="' + escAttr(r.store_name) + '" '
+         + 'value="' + escAttr(transferNote) + '" placeholder="如 4/12 泰山轉平鎮" />'
+         + '</td>';
+    // 調整金額：可編輯 input（可正可負）
+    html += '<td class="r">'
+         + '<input type="number" class="amount-input adjustment-input" data-store="' + escAttr(r.store_name) + '" '
+         + 'value="' + adjustment + '" step="1" />'
+         + '<button type="button" class="btn-section-save btn-adjustment-save" data-store="' + escAttr(r.store_name) + '" title="儲存調整">💾</button>'
+         + '</td>';
+    // 調整備註
+    html += '<td>'
+         + '<input type="text" class="note-input adjustment-note-input" data-store="' + escAttr(r.store_name) + '" '
+         + 'value="' + escAttr(adjustmentNote) + '" placeholder="如 3 月退貨未扣" />'
+         + '</td>';
     html += '<td class="r"' + netCls + '><b>' + netStr + '</b></td>';
     html += '</tr>';
   }
   tbody.innerHTML = html;
 
   // 合計
-  const totNet = totSales - totReturns + totFee + totTransfer;
+  const totNet = totSales - totReturns + totFee + totTransfer + totAdjustment;
   document.getElementById('total-sales-cnt').textContent = totSalesCnt;
   document.getElementById('total-sales').textContent = '$' + totSales.toLocaleString();
   document.getElementById('total-returns-cnt').textContent = totReturnsCnt;
@@ -895,26 +919,23 @@ function renderReportTable(rows) {
     ? '-$' + totReturns.toLocaleString()
     : '$0';
   document.getElementById('total-fee').textContent = '$' + totFee.toLocaleString();
-  document.getElementById('total-transfer').textContent = '$' + totTransfer.toLocaleString();
-  document.getElementById('total-net').textContent = totNet < 0
-    ? '-$' + Math.abs(totNet).toLocaleString()
-    : '$' + totNet.toLocaleString();
+  document.getElementById('total-transfer').textContent = formatSignedAmount(totTransfer);
+  document.getElementById('total-adjustment').textContent = formatSignedAmount(totAdjustment);
+  document.getElementById('total-net').textContent = formatSignedAmount(totNet);
   tfoot.style.display = '';
 
-  // 綁事件：店名點擊進明細 / 月費編輯
+  // 綁事件：店名點擊進明細
   const storeLinks = tbody.querySelectorAll('.store-link');
   for (let i = 0; i < storeLinks.length; i++) {
     storeLinks[i].addEventListener('click', function () {
       openStoreDetail(this.dataset.store);
     });
   }
+  // 月費編輯
   const feeInputs = tbody.querySelectorAll('.fee-input');
   for (let i = 0; i < feeInputs.length; i++) {
     feeInputs[i].addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); saveFee(this.dataset.store, this.value); }
-    });
-    feeInputs[i].addEventListener('blur', function () {
-      // blur 不自動存（避免 click 💾 同時觸發）
     });
   }
   const saveBtns = tbody.querySelectorAll('.btn-fee-save');
@@ -925,6 +946,34 @@ function renderReportTable(rows) {
       saveFee(store, input.value);
     });
   }
+  // 店轉店儲存
+  const transferSaveBtns = tbody.querySelectorAll('.btn-transfer-save');
+  for (let i = 0; i < transferSaveBtns.length; i++) {
+    transferSaveBtns[i].addEventListener('click', function () {
+      const store = this.dataset.store;
+      const amtIn = tbody.querySelector('.transfer-input[data-store="' + store + '"]');
+      const noteIn = tbody.querySelector('.transfer-note-input[data-store="' + store + '"]');
+      saveSection(store, 'transfer', amtIn.value, noteIn.value);
+    });
+  }
+  // 調整儲存
+  const adjustmentSaveBtns = tbody.querySelectorAll('.btn-adjustment-save');
+  for (let i = 0; i < adjustmentSaveBtns.length; i++) {
+    adjustmentSaveBtns[i].addEventListener('click', function () {
+      const store = this.dataset.store;
+      const amtIn = tbody.querySelector('.adjustment-input[data-store="' + store + '"]');
+      const noteIn = tbody.querySelector('.adjustment-note-input[data-store="' + store + '"]');
+      saveSection(store, 'adjustment', amtIn.value, noteIn.value);
+    });
+  }
+}
+
+// 含正負號的金額格式化（合計列用）
+function formatSignedAmount(v) {
+  const n = Number(v) || 0;
+  if (n === 0) return '$0';
+  if (n < 0) return '-$' + Math.abs(n).toLocaleString();
+  return '$' + n.toLocaleString();
 }
 
 async function saveFee(storeName, feeValue) {
@@ -950,6 +999,35 @@ async function saveFee(storeName, feeValue) {
 }
 
 
+// 儲存「店轉店」或「調整金額」（共用一支函式，section 區分）
+async function saveSection(storeName, section, amountValue, noteValue) {
+  // 防呆：空字串 / null 要明確擋下（避免不小心清空變 0）
+  if (amountValue === '' || amountValue === null || amountValue === undefined) {
+    alert('金額不可空白（要設為 0 請明確輸入「0」）');
+    return;
+  }
+  const amount = Number(amountValue);
+  if (isNaN(amount)) {
+    alert('金額必須是數字（可正可負，例如 -500 或 300）');
+    return;
+  }
+  const sectionLabel = section === 'transfer' ? '店轉店' : '調整';
+  const statusEl = document.getElementById('report-status');
+  statusEl.className = 'status-bar status-info';
+  statusEl.textContent = '儲存 ' + storeName + ' ' + sectionLabel + '：' + formatSignedAmount(amount) + '...';
+  statusEl.style.display = '';
+  try {
+    await ltUpdateStoreMonthlyData(storeName, _lastReportMonth, section, amount, noteValue || '');
+    statusEl.className = 'status-bar status-success';
+    statusEl.textContent = '✅ ' + storeName + ' ' + sectionLabel + ' 已存（' + formatSignedAmount(amount) + '），重新整理彙總表...';
+    await loadMonthlyReport();
+  } catch (err) {
+    statusEl.className = 'status-bar status-error';
+    statusEl.textContent = '❌ ' + sectionLabel + ' 儲存失敗：' + err.message;
+  }
+}
+
+
 // ============================================================
 // 店家明細頁
 // ============================================================
@@ -959,6 +1037,9 @@ let _lastDetailStore = '';
 let _lastDetailMonth = '';
 let _lastDetailFee = 0;
 let _lastDetailTransfer = 0;
+let _lastDetailTransferNote = '';
+let _lastDetailAdjustment = 0;
+let _lastDetailAdjustmentNote = '';
 
 async function openStoreDetail(storeName) {
   _lastDetailStore = storeName;
@@ -976,10 +1057,13 @@ async function openStoreDetail(storeName) {
   statusEl.textContent = '查詢 ' + storeName + ' ' + _lastReportMonth + ' 明細...';
   statusEl.style.display = '';
 
-  // 從彙總列拿月費 / 店轉店（避免再 fetch）
+  // 從彙總列拿月費 / 店轉店 / 調整（避免再 fetch）
   const summaryRow = (_lastReportRows || []).find(r => r.store_name === storeName) || {};
   _lastDetailFee = Number(summaryRow.monthly_fee) || 0;
-  _lastDetailTransfer = Number(summaryRow.transfer_net) || 0;
+  _lastDetailTransfer = Number(summaryRow.transfer_amount) || 0;
+  _lastDetailTransferNote = String(summaryRow.transfer_note || '');
+  _lastDetailAdjustment = Number(summaryRow.adjustment_amount) || 0;
+  _lastDetailAdjustmentNote = String(summaryRow.adjustment_note || '');
 
   try {
     const rows = await ltGetStoreMonthlyDetail(storeName, _lastReportMonth);
@@ -1043,9 +1127,9 @@ function renderDetailTable() {
   }
   if (rows.length > 0) tbody.innerHTML = html;
 
-  // 小計 + 月費 + 店轉店 + 應收
+  // 小計 + 月費 + 店轉店 + 調整 + 應收
   const subNet = subSales - subReturns;
-  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer;
+  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer + _lastDetailAdjustment;
   document.getElementById('detail-sub-qty').textContent = subQty;
   document.getElementById('detail-sub-sales').textContent = '$' + subSales.toLocaleString();
   document.getElementById('detail-sub-returns').textContent = subReturns > 0
@@ -1055,10 +1139,24 @@ function renderDetailTable() {
     ? '-$' + Math.abs(subNet).toLocaleString()
     : '$' + subNet.toLocaleString();
   document.getElementById('detail-fee').textContent = '$' + _lastDetailFee.toLocaleString();
-  document.getElementById('detail-transfer').textContent = '$' + _lastDetailTransfer.toLocaleString();
-  document.getElementById('detail-grand-net').textContent = grandNet < 0
-    ? '-$' + Math.abs(grandNet).toLocaleString()
-    : '$' + grandNet.toLocaleString();
+  document.getElementById('detail-transfer').textContent = formatSignedAmount(_lastDetailTransfer);
+  document.getElementById('detail-adjustment').textContent = formatSignedAmount(_lastDetailAdjustment);
+  // 備註顯示在 label 後（如有）
+  const transferLabel = document.getElementById('detail-transfer-label');
+  if (transferLabel) {
+    transferLabel.innerHTML = '＋ 店轉店淨額'
+      + (_lastDetailTransferNote
+          ? '<span class="detail-side-note">（' + escHtml(_lastDetailTransferNote) + '）</span>'
+          : '');
+  }
+  const adjustmentLabel = document.getElementById('detail-adjustment-label');
+  if (adjustmentLabel) {
+    adjustmentLabel.innerHTML = '＋ 調整金額'
+      + (_lastDetailAdjustmentNote
+          ? '<span class="detail-side-note">（' + escHtml(_lastDetailAdjustmentNote) + '）</span>'
+          : '');
+  }
+  document.getElementById('detail-grand-net').textContent = formatSignedAmount(grandNet);
   tfoot.style.display = '';
 }
 
@@ -1090,11 +1188,21 @@ function exportDetailExcel() {
       '淨額':     net
     });
   }
-  // 小計、月費、店轉店、應收
+  // 小計、月費、店轉店、調整、應收
   rows.push({ '日期': '【明細小計】', '單號': '', '銷貨金額': subSales, '退貨金額': subReturns, '淨額': subSales - subReturns });
-  rows.push({ '日期': '＋月費',        '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailFee });
-  rows.push({ '日期': '＋店轉店淨額',  '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailTransfer });
-  rows.push({ '日期': '【本月應收】',  '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': (subSales - subReturns) + _lastDetailFee + _lastDetailTransfer });
+  rows.push({ '日期': '＋月費',        '單號': '', '銷貨金額': '', '退貨金額': '', '淨額': _lastDetailFee });
+  rows.push({
+    '日期': '＋店轉店淨額' + (_lastDetailTransferNote ? '（' + _lastDetailTransferNote + '）' : ''),
+    '單號': '', '銷貨金額': '', '退貨金額': '', '淨額': _lastDetailTransfer
+  });
+  rows.push({
+    '日期': '＋調整金額' + (_lastDetailAdjustmentNote ? '（' + _lastDetailAdjustmentNote + '）' : ''),
+    '單號': '', '銷貨金額': '', '退貨金額': '', '淨額': _lastDetailAdjustment
+  });
+  rows.push({
+    '日期': '【本月應收】', '單號': '', '銷貨金額': '', '退貨金額': '',
+    '淨額': (subSales - subReturns) + _lastDetailFee + _lastDetailTransfer + _lastDetailAdjustment
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
@@ -1139,7 +1247,19 @@ function printStoreDetail() {
   }
 
   const subNet = subSales - subReturns;
-  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer;
+  const grandNet = subNet + _lastDetailFee + _lastDetailTransfer + _lastDetailAdjustment;
+
+  // 金額格式（正負/0）+ tfoot 列輔助
+  const fmtAmt = function (n) {
+    const v = Number(n) || 0;
+    if (v < 0) return '-$' + Math.abs(v).toLocaleString();
+    return '$' + v.toLocaleString();
+  };
+  const transferLabel = '＋ 店轉店淨額'
+    + (_lastDetailTransferNote ? '<small style="color:#888;font-weight:normal;">（' + escHtml(_lastDetailTransferNote) + '）</small>' : '');
+  const adjustmentLabel = '＋ 調整金額'
+    + (_lastDetailAdjustmentNote ? '<small style="color:#888;font-weight:normal;">（' + escHtml(_lastDetailAdjustmentNote) + '）</small>' : '');
+
   const html = ''
     + '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'
     + _lastDetailStore + ' ' + _lastDetailMonth + ' 月結對帳單</title>'
@@ -1155,7 +1275,7 @@ function printStoreDetail() {
     + '.mono { font-family: Consolas, monospace; }'
     + '.negative { color: #c00; font-weight: bold; }'
     + '.subtotal-row th { background: #f5f5f5; }'
-    + '.addon-row th { background: #fafafa; font-weight: normal; }'
+    + '.addon-row th { background: #fafafa; font-weight: normal; text-align: left; }'
     + '.total-row th { background: #fff3e0; color: #b53400; font-size: 14px; }'
     + '.print-actions { position: fixed; top: 8px; right: 8px; }'
     + '.print-actions button { padding: 6px 14px; font-size: 13px; cursor: pointer; }'
@@ -1174,12 +1294,13 @@ function printStoreDetail() {
     +     '<tr class="subtotal-row"><th colspan="2">明細小計</th>'
     +       '<th class="r">$' + subSales.toLocaleString() + '</th>'
     +       '<th class="r' + (subReturns > 0 ? ' negative' : '') + '">' + (subReturns > 0 ? '-$' + subReturns.toLocaleString() : '$0') + '</th>'
-    +       '<th class="r">' + (subNet < 0 ? '-$' + Math.abs(subNet).toLocaleString() : '$' + subNet.toLocaleString()) + '</th>'
+    +       '<th class="r">' + fmtAmt(subNet) + '</th>'
     +     '</tr>'
     +     '<tr class="addon-row"><th colspan="4">＋ 月費</th><th class="r">$' + _lastDetailFee.toLocaleString() + '</th></tr>'
-    +     '<tr class="addon-row"><th colspan="4">＋ 店轉店淨額（v2 接入）</th><th class="r">$' + _lastDetailTransfer.toLocaleString() + '</th></tr>'
+    +     '<tr class="addon-row"><th colspan="4">' + transferLabel + '</th><th class="r' + (_lastDetailTransfer < 0 ? ' negative' : '') + '">' + fmtAmt(_lastDetailTransfer) + '</th></tr>'
+    +     '<tr class="addon-row"><th colspan="4">' + adjustmentLabel + '</th><th class="r' + (_lastDetailAdjustment < 0 ? ' negative' : '') + '">' + fmtAmt(_lastDetailAdjustment) + '</th></tr>'
     +     '<tr class="total-row"><th colspan="4">本月應收</th>'
-    +       '<th class="r">' + (grandNet < 0 ? '-$' + Math.abs(grandNet).toLocaleString() : '$' + grandNet.toLocaleString()) + '</th>'
+    +       '<th class="r">' + fmtAmt(grandNet) + '</th>'
     +     '</tr>'
     +   '</tfoot>'
     + '</table>'
@@ -1202,14 +1323,17 @@ function exportReportExcel() {
   }
 
   const rows = [];
-  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0;
+  let totSales = 0, totReturns = 0, totFee = 0, totTransfer = 0, totAdjustment = 0;
   let totSalesCnt = 0, totReturnsCnt = 0;
   for (let i = 0; i < _lastReportRows.length; i++) {
     const r = _lastReportRows[i];
     const sales = Number(r.sales_amount) || 0;
     const returns = Number(r.returns_amount) || 0;
     const fee = Number(r.monthly_fee) || 0;
-    const transfer = Number(r.transfer_net) || 0;
+    const transfer = Number(r.transfer_amount) || 0;
+    const transferNote = String(r.transfer_note || '');
+    const adjustment = Number(r.adjustment_amount) || 0;
+    const adjustmentNote = String(r.adjustment_note || '');
     const net = Number(r.net_amount) || 0;
     const salesCnt = Number(r.sales_count) || 0;
     const returnsCnt = Number(r.returns_count) || 0;
@@ -1217,6 +1341,7 @@ function exportReportExcel() {
     totReturns += returns;
     totFee += fee;
     totTransfer += transfer;
+    totAdjustment += adjustment;
     totSalesCnt += salesCnt;
     totReturnsCnt += returnsCnt;
     rows.push({
@@ -1227,6 +1352,9 @@ function exportReportExcel() {
       '退貨金額':     returns,
       '月費':         fee,
       '店轉店淨額':   transfer,
+      '店轉店備註':   transferNote,
+      '調整金額':     adjustment,
+      '調整備註':     adjustmentNote,
       '本月應收':     net
     });
   }
@@ -1239,13 +1367,16 @@ function exportReportExcel() {
     '退貨金額':     totReturns,
     '月費':         totFee,
     '店轉店淨額':   totTransfer,
-    '本月應收':     totSales - totReturns + totFee + totTransfer
+    '店轉店備註':   '',
+    '調整金額':     totAdjustment,
+    '調整備註':     '',
+    '本月應收':     totSales - totReturns + totFee + totTransfer + totAdjustment
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
     { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 },
-    { wch: 10 }, { wch: 12 }, { wch: 14 }
+    { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 22 }, { wch: 14 }
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, _lastReportMonth + ' 月結');
