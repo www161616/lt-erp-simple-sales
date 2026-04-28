@@ -149,17 +149,84 @@ function updateBatchPrintButton() {
 async function doSearch() {
   setStatusBar('查詢中...', 'info');
   const tbody = document.getElementById('orders-tbody');
-  tbody.innerHTML = '<tr><td colspan="9" class="empty">⏳ 載入中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" class="empty">⏳ 載入中...</td></tr>';
   _lastPrintableOrders = [];
   updateBatchPrintButton();
 
   try {
     const filters = getCurrentFilters();
-    const rows = await ltGetAllOrders(filters);
-    let arr = Array.isArray(rows) ? rows : [];
 
-    // ⚡ 任務 4.1 D 段：status filter 為空時排除暫存單（is_draft=true）
-    //   要看暫存單必須明確選「📝 暫存」（後端 status='暫存' 自動只回暫存）
+    // 是否要併入舊系統 (legacy) 資料
+    //   - 暫存 / 待處理 / 已收到 / 有問題：legacy 沒這些狀態，跳過
+    //   - 退貨狀態 申請中 / 處理中 / 已解決：legacy 沒這些狀態，跳過
+    const skipLegacyByStatus = filters.status && filters.status !== '已建單';
+    const skipLegacyByReturn = filters.returnStatus && filters.returnStatus !== '無';
+    const includeLegacy = !skipLegacyByStatus && !skipLegacyByReturn;
+
+    // status='已建單' 時 RT 退貨單不該混進來 → 從源頭只抓 normal
+    // status=null（全部）時 SO + RT 都要抓
+    // returnStatus='無' 時 RT 也不該混進來（RT 整張就是退貨）→ 也只抓 normal
+    let legacyOrderType = null;
+    if (filters.status === '已建單' || filters.returnStatus === '無') {
+      legacyOrderType = 'normal';
+    }
+
+    const calls = [ltGetAllOrders(filters)];
+    if (includeLegacy) {
+      calls.push(
+        ltGetLegacyAllOrders({
+          from:      filters.from,
+          to:        filters.to,
+          store:     filters.store,
+          orderType: legacyOrderType,
+          search:    filters.search,
+          limit:     filters.limit
+        }).catch(err => {
+          console.warn('legacy fetch fail:', err);
+          return [];
+        })
+      );
+    }
+
+    const results = await Promise.all(calls);
+    const simpleRows = Array.isArray(results[0]) ? results[0] : [];
+    const legacyRows = Array.isArray(results[1]) ? results[1] : [];
+
+    let arr = [];
+    simpleRows.forEach(o => {
+      o._dataType = 'simple';
+      arr.push(o);
+    });
+    legacyRows.forEach(o => {
+      // legacy: 對齊 simple 欄位讓 render 函式好寫
+      o._dataType = (o.order_type === 'return') ? 'legacy_return' : 'legacy_normal';
+      o.status        = (o._dataType === 'legacy_return') ? '退貨' : '已建單';
+      o.is_draft      = false;
+      o.return_status = o.has_return ? '↳ 退' : null;
+      arr.push(o);
+    });
+
+    // returnStatus='無' → 排除 RT 退貨單（整張就是退貨），legacy_normal 只保留 has_return=false
+    //   （legacy_return 在源頭已經被 legacyOrderType='normal' 擋掉，這裡是雙重保險）
+    if (filters.returnStatus === '無') {
+      arr = arr.filter(o => {
+        if (o._dataType === 'simple')         return true;        // simple 後端已篩
+        if (o._dataType === 'legacy_return')  return false;       // RT 整張就是退貨
+        return !o.has_return;                                     // legacy_normal: 沒退貨明細才算「無」
+      });
+    }
+
+    // 排序：交期/訂單日 DESC → created_at DESC
+    arr.sort((a, b) => {
+      const aDate = String(a.delivery_date || a.order_date || '');
+      const bDate = String(b.delivery_date || b.order_date || '');
+      if (aDate !== bDate) return bDate.localeCompare(aDate);
+      const aCreated = String(a.created_at || '');
+      const bCreated = String(b.created_at || '');
+      return bCreated.localeCompare(aCreated);
+    });
+
+    // 排除暫存單（除非明確選「暫存」）— 只對 simple 生效
     let draftHiddenCount = 0;
     if (!filters.status) {
       const before = arr.length;
@@ -167,35 +234,43 @@ async function doSearch() {
       draftHiddenCount = before - arr.length;
     }
 
+    const simpleCount = arr.filter(o => o._dataType === 'simple').length;
+    const legacyCount = arr.length - simpleCount;
+
     if (arr.length === 0) {
       const suffix = draftHiddenCount > 0
         ? '（已隱藏 ' + draftHiddenCount + ' 張暫存單，要看請選狀態「📝 暫存」）'
         : '（無符合資料）';
       setStatusBar('共 0 筆 ' + suffix, 'info');
-    } else if (arr.length >= 1000) {
-      setStatusBar('共 ' + arr.length + ' 筆（已達上限 1000，建議縮小篩選範圍）', 'warning');
     } else {
       let msg = '共 ' + arr.length + ' 筆';
+      if (legacyCount > 0) {
+        msg += '（一般 ' + simpleCount + ' / 📜 歷史 ' + legacyCount + '）';
+      }
       if (draftHiddenCount > 0) {
         msg += '（另有 ' + draftHiddenCount + ' 張暫存單已隱藏，要看請選狀態「📝 暫存」）';
       }
-      setStatusBar(msg, 'success');
+      const tone = (arr.length >= 1000) ? 'warning' : 'success';
+      setStatusBar(msg, tone);
     }
+
     renderOrders(arr);
 
-    // 任務 4 D 段：把可列印的非暫存單號收集起來給批次列印
-    _lastPrintableOrders = arr.filter(o => !o.is_draft).map(o => o.order_no);
+    // 批次列印 / Excel 匯出：只收 simple 非暫存單（舊單暫不支援列印）
+    _lastPrintableOrders = arr
+      .filter(o => o._dataType === 'simple' && !o.is_draft)
+      .map(o => o.order_no);
     updateBatchPrintButton();
   } catch (err) {
     setStatusBar('❌ 查詢失敗：' + err.message, 'error');
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">查詢失敗</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">查詢失敗</td></tr>';
   }
 }
 
 function doBatchPrint() {
   const orders = _lastPrintableOrders;
   if (!orders || orders.length === 0) {
-    alert('沒有可列印的單（暫存單不可列印）');
+    alert('沒有可列印的單。\n\n（📜 歷史單暫不支援列印；📝 暫存單不可列印）');
     return;
   }
   if (orders.length > 100) {
@@ -219,7 +294,7 @@ function doBatchPrint() {
 async function doExportExcel() {
   const orders = _lastPrintableOrders;
   if (!orders || orders.length === 0) {
-    alert('沒有可匯出的資料（暫存單不會匯出）');
+    alert('沒有可匯出的資料。\n\n（📜 歷史單暫不支援匯出；📝 暫存單不會匯出）');
     return;
   }
   if (orders.length > 100) {
@@ -343,32 +418,70 @@ function doReset() {
 function renderOrders(orders) {
   const tbody = document.getElementById('orders-tbody');
   if (!orders || orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">沒有符合的訂單</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">沒有符合的訂單</td></tr>';
     return;
   }
   let html = '';
   for (let i = 0; i < orders.length; i++) {
     const o = orders[i];
-    const isDraft = !!o.is_draft;
-    const rowClass = isDraft ? ' class="draft-row"' : '';
-    html += '<tr' + rowClass + '>';
+    const isDraft  = !!o.is_draft;
+    const isLegacy = (o._dataType === 'legacy_normal' || o._dataType === 'legacy_return');
+    const isLegacyReturn = (o._dataType === 'legacy_return');
+
+    let rowClass = '';
+    if (isDraft) rowClass = 'draft-row';
+    else if (isLegacy) rowClass = 'legacy-row';
+    const trCls = rowClass ? ' class="' + rowClass + '"' : '';
+
+    html += '<tr' + trCls + '>';
     html += '<td><a data-order="' + escAttr(o.order_no) + '" class="order-link">' + escHtml(o.order_no) + '</a></td>';
+
+    // 類型欄
+    if (isLegacyReturn) {
+      html += '<td><span class="badge b-legacy-return" title="舊系統退貨單（沖帳）">📜 歷史退貨</span></td>';
+    } else if (isLegacy) {
+      html += '<td><span class="badge b-legacy" title="舊系統 4/22 之前的單">📜 歷史</span></td>';
+    } else {
+      html += '<td><span class="badge b-simple">📦 一般</span></td>';
+    }
+
     html += '<td>' + escHtml(o.store_name) + '</td>';
     html += '<td>' + (o.order_date    || '') + '</td>';
     html += '<td>' + (o.delivery_date || '') + '</td>';
     html += '<td class="r">' + (o.total_qty || 0) + '</td>';
-    html += '<td class="r">$' + (Number(o.total_amount) || 0).toLocaleString() + '</td>';
+
+    // 金額欄：負數紅字
+    const amount = Number(o.total_amount) || 0;
+    const amountCls = amount < 0 ? ' negative' : '';
+    const amountStr = amount < 0
+      ? '-$' + Math.abs(amount).toLocaleString()
+      : '$' + amount.toLocaleString();
+    html += '<td class="r' + amountCls + '">' + amountStr + '</td>';
+
+    // 狀態欄
     if (isDraft) {
       html += '<td><span class="badge b-draft">📝 暫存</span></td>';
+    } else if (isLegacyReturn) {
+      html += '<td><span class="badge b-return-order">退貨單</span></td>';
     } else {
       html += '<td><span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span></td>';
     }
-    if (o.has_return) {
-      html += '<td><span class="badge ' + returnClass(o.return_status) + '">' + escHtml(o.return_status) + '</span></td>';
+
+    // 退貨欄
+    if (isLegacyReturn) {
+      // RT 整張就是退貨單，這欄留 -
+      html += '<td><small style="color:#999;">-</small></td>';
+    } else if (o.has_return) {
+      const txt = o.return_status || '↳ 退';
+      html += '<td><span class="badge ' + returnClass(o.return_status) + '">' + escHtml(txt) + '</span></td>';
     } else {
       html += '<td><small style="color:#999;">-</small></td>';
     }
-    if (isDraft) {
+
+    // 動作欄
+    if (isLegacy) {
+      html += '<td class="c"><button class="btn-mini" disabled title="📜 歷史單暫不支援列印">🔒</button></td>';
+    } else if (isDraft) {
       html += '<td class="c"><button class="btn-mini" disabled title="暫存單不可列印">🚫</button></td>';
     } else {
       html += '<td class="c"><button class="btn-mini" disabled title="D 段開放">📄</button></td>';
@@ -395,8 +508,19 @@ async function openDetailModal(orderNo) {
   document.getElementById('detail-modal').style.display = '';
   document.getElementById('modal-body').innerHTML = '<div class="loading">⏳ 載入中...</div>';
 
+  // 依 prefix 路由：SS- → simple，SO/RT → legacy
+  const isLegacy = orderNo && String(orderNo).indexOf('SS-') !== 0;
+
   try {
-    const data = await ltGetOrderDetails(orderNo);
+    let data;
+    if (isLegacy) {
+      data = await ltGetLegacyOrderDetails(orderNo);
+      data._dataType = (data && data.order && data.order.order_type === 'return')
+        ? 'legacy_return' : 'legacy_normal';
+    } else {
+      data = await ltGetOrderDetails(orderNo);
+      data._dataType = 'simple';
+    }
     renderModalBody(data);
   } catch (err) {
     document.getElementById('modal-body').innerHTML =
@@ -411,29 +535,58 @@ function closeDetailModal() {
 function renderModalBody(data) {
   const o = (data && data.order) || {};
   const items = (data && data.items) || [];
-  const isDraft = !!o.is_draft;
+  const isDraft  = !!o.is_draft;
+  const dataType = (data && data._dataType) || 'simple';
+  const isLegacy = (dataType === 'legacy_normal' || dataType === 'legacy_return');
+  const isLegacyReturn = (dataType === 'legacy_return');
   let html = '';
 
   html += '<h2 class="modal-title">' + escHtml(o.order_no) + ' / ' + escHtml(o.store_name);
-  if (isDraft) {
+  if (isLegacyReturn) {
+    html += '<span class="badge b-legacy-return">📜 歷史退貨</span>';
+  } else if (isLegacy) {
+    html += '<span class="badge b-legacy">📜 歷史</span>';
+  } else if (isDraft) {
     html += '<span class="badge b-draft">📝 暫存</span>';
   } else {
     html += '<span class="badge ' + statusClass(o.status) + '">' + escHtml(o.status) + '</span>';
+  }
+  // RT 退貨單：在標題列補「↩️ 原單」徽章
+  if (isLegacyReturn && o.ref_order_no) {
+    html += '<span class="badge b-ref-order" title="此退貨單沖的原銷貨單">↩️ 原單：'
+         + escHtml(o.ref_order_no) + '</span>';
   }
   html += '</h2>';
 
   html += '<div class="modal-meta">';
   html += '<span>📅 訂單：' + (o.order_date || '-') + '</span>';
-  html += '<span>🚚 出貨：' + (o.delivery_date || '-') + '</span>';
+  if (!isLegacy) {
+    html += '<span>🚚 出貨：' + (o.delivery_date || '-') + '</span>';
+  }
   html += '<span>📦 ' + (o.total_qty || 0) + ' 件</span>';
-  html += '<span>💰 $' + (Number(o.total_amount) || 0).toLocaleString() + '</span>';
+  // 金額：負數紅字
+  const amount = Number(o.total_amount) || 0;
+  const amountStr = amount < 0
+    ? '<span class="negative">-$' + Math.abs(amount).toLocaleString() + '</span>'
+    : '$' + amount.toLocaleString();
+  html += '<span>💰 ' + amountStr + '</span>';
   if (o.picker_email) html += '<span>👤 ' + escHtml(o.picker_email) + '</span>';
-  if (o.received_at) html += '<span>✅ 收貨：' + formatTs(o.received_at) + '</span>';
-  if (o.has_return) html += '<span class="return-badge">⚠️ 退貨：' + escHtml(o.return_status) + '</span>';
+  if (o.received_at)  html += '<span>✅ 收貨：' + formatTs(o.received_at) + '</span>';
+  if (!isLegacy && o.has_return) {
+    html += '<span class="return-badge">⚠️ 退貨：' + escHtml(o.return_status) + '</span>';
+  }
   html += '</div>';
 
-  // ⚡ 任務 4.1 D 段：暫存單警示框
-  if (isDraft) {
+  if (o.note) {
+    html += '<div class="modal-note">📝 備註：' + escHtml(o.note) + '</div>';
+  }
+
+  if (isLegacy) {
+    html += '<div class="legacy-warn">';
+    html +=   '<b>📜 此單為舊系統（4/22 之前）資料 — 唯讀</b><br/>';
+    html +=   '<small>暫不支援列印。如需列印請至舊系統 branch_admin 查詢。</small>';
+    html += '</div>';
+  } else if (isDraft) {
     html += '<div class="draft-warn">';
     html +=   '<b>⚠️ 此單為暫存單，數量與品項仍可能調整</b><br/>';
     html +=   '尚未由撿貨員確認送出，<b>不會出現在店家「待收貨」清單</b>，也不能列印。<br/>';
@@ -449,15 +602,32 @@ function renderModalBody(data) {
     html += '<tbody>';
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      const hasReturn = it.return_status && it.return_status !== '無';
-      html += '<tr' + (hasReturn ? ' class="return-row"' : '') + '>';
+      // 退貨欄位：legacy 舊資料是英文，需翻譯；'none'/'NULL'/'' 視為無
+      const rsRaw = String(it.return_status || '').trim();
+      const rsLow = rsRaw.toLowerCase();
+      const rsValid = rsRaw && rsLow !== 'none' && rsLow !== 'null' && rsRaw !== '無';
+      const hasReturnQty = (Number(it.return_qty) || 0) > 0;
+      // RT 整張就是退貨單，明細不再標 ↳
+      const showReturnNote = !isLegacyReturn && (rsValid || hasReturnQty);
+
+      const rowClass = showReturnNote ? ' class="return-row"' : '';
+      const subtotal = Number(it.subtotal) || 0;
+      const subtotalStr = subtotal < 0
+        ? '<span class="negative">-$' + Math.abs(subtotal).toLocaleString() + '</span>'
+        : '$' + subtotal.toLocaleString();
+
+      html += '<tr' + rowClass + '>';
       html += '<td class="mono">' + escHtml(it.product_id) + '</td>';
       html += '<td>' + escHtml(it.product_name);
-      if (hasReturn) {
+      if (showReturnNote) {
+        const reportTypeText = isLegacy ? translateReportType(it.report_type) : (it.report_type || '?');
+        const returnStatusText = isLegacy ? translateReturnStatus(rsRaw) : rsRaw;
         html += '<br/><span class="return-info">↳ '
-             + '【' + escHtml(it.report_type || '?') + '】'
-             + ' ×' + (it.return_qty || 0)
-             + '（退貨狀態：' + escHtml(it.return_status) + '）';
+             + '【' + escHtml(reportTypeText || '退') + '】'
+             + ' ×' + (it.return_qty || 0);
+        if (returnStatusText) {
+          html += '（退貨狀態：' + escHtml(returnStatusText) + '）';
+        }
         if (it.return_reason) html += '｜原因：' + escHtml(it.return_reason);
         html += '</span>';
         if (it.admin_response) {
@@ -467,14 +637,16 @@ function renderModalBody(data) {
       html += '</td>';
       html += '<td class="r">' + (it.qty || 0) + '</td>';
       html += '<td class="r">$' + (Number(it.unit_price) || 0).toLocaleString() + '</td>';
-      html += '<td class="r">$' + (Number(it.subtotal)   || 0).toLocaleString() + '</td>';
+      html += '<td class="r">' + subtotalStr + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table>';
   }
 
   html += '<div class="modal-actions">';
-  if (isDraft) {
+  if (isLegacy) {
+    html += '<button class="btn-disabled" disabled title="📜 歷史單暫不支援列印">🔒 歷史單暫不支援列印</button>';
+  } else if (isDraft) {
     html += '<button class="btn-disabled" disabled title="暫存單不可列印">🚫 暫存單不可列印</button>';
   } else {
     html += '<button class="btn-primary" id="btn-print-this">📄 列印此單</button>';
@@ -485,14 +657,38 @@ function renderModalBody(data) {
   const body = document.getElementById('modal-body');
   body.innerHTML = html;
   body.querySelector('#btn-close-modal-bottom').addEventListener('click', closeDetailModal);
-  // ⚡ 任務 4 D 段：列印此單 → 開新分頁跳到 print.html
   const btnPrint = body.querySelector('#btn-print-this');
-  if (btnPrint && !isDraft) {
+  if (btnPrint && !isDraft && !isLegacy) {
     btnPrint.addEventListener('click', function () {
       const url = 'print.html?orders=' + encodeURIComponent(o.order_no);
       window.open(url, '_blank');
     });
   }
+}
+
+
+// ============================================================
+// 工具：舊系統英文值翻譯（給 legacy modal 用，跟店家 Sheet 同邏輯）
+// ============================================================
+
+function translateReportType(t) {
+  const s = String(t || '').toLowerCase();
+  if (s === 'return')                    return '退';
+  if (s === 'shortage' || s === 'short') return '少';
+  if (s === 'damaged'  || s === 'damage')return '損';
+  if (s === 'missing')                   return '缺';
+  return t || '';
+}
+
+function translateReturnStatus(s) {
+  const x = String(s || '').toLowerCase();
+  if (x === 'requested') return '申請中';
+  if (x === 'accepted')  return '已同意';
+  if (x === 'received')  return '已收到';
+  if (x === 'rejected')  return '已拒絕';
+  if (x === 'waived')    return '免退';
+  if (x === 'none' || x === 'null' || x === '') return '';
+  return s || '';
 }
 
 

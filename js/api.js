@@ -61,3 +61,32 @@ window.ltGetOrdersBatch = async function (orderNos) {
     p_order_nos:    orderNos
   });
 };
+
+
+// ============================================================
+// 舊系統 admin 版（4/22 之前的銷貨單 + 退貨單）
+// ============================================================
+
+// 取舊單列表（filters 為 {from, to, store, orderType, search, limit}）
+//   orderType: 'normal' | 'return' | null（全部）
+window.ltGetLegacyAllOrders = async function (filters) {
+  filters = filters || {};
+  return await ltCallRpc('get_legacy_all_orders_admin', {
+    p_admin_secret: null,
+    p_date_from:    filters.from       || null,
+    p_date_to:      filters.to         || null,
+    p_store_name:   filters.store      || null,
+    p_order_type:   filters.orderType  || null,
+    p_search:       filters.search     || null,
+    p_limit:        filters.limit      || 500
+  });
+};
+
+
+// 取舊單明細（SO/RT 共用）
+window.ltGetLegacyOrderDetails = async function (orderNo) {
+  return await ltCallRpc('get_legacy_order_details_admin', {
+    p_admin_secret: null,
+    p_order_no:     orderNo
+  });
+};

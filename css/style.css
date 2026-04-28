@@ -568,3 +568,55 @@ body {
 }
 .draft-warn b { color: #d84315; }
 .draft-warn small { color: #6d4c41; }
+
+
+/* ============================================================
+   2026-04-29：舊系統 (legacy) 整合樣式
+   ============================================================ */
+
+/* 列表 — 類型徽章 */
+.b-simple        { background: #e3f2fd; color: #1565c0; }                                /* 📦 一般 — 藍 */
+.b-legacy        { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; }     /* 📜 歷史 — 琥珀 */
+.b-legacy-return { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }     /* 📜 歷史退貨 — 紅 */
+.b-return-order  { background: #ffcdd2; color: #b71c1c; }                                /* 退貨單（狀態欄）*/
+.b-ref-order     { background: #fff3e0; color: #e65100; border: 1px solid #ffb74d; font-family: monospace; }
+
+/* 舊單列底色（淡灰，跟暫存淡黃區隔）*/
+.orders-table tr.legacy-row {
+  background: #fafafa;
+}
+.orders-table tr.legacy-row:hover {
+  background: #f0f0f0;
+}
+
+/* 負金額紅字（列表 + modal）*/
+.orders-table td.negative,
+.modal-meta .negative,
+.modal-items .negative {
+  color: #c62828;
+  font-weight: bold;
+}
+
+/* modal — 舊單唯讀警示框 */
+.legacy-warn {
+  background: #fff3e0;
+  border: 2px solid #fb8c00;
+  color: #bf360c;
+  padding: 12px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.legacy-warn b { color: #e65100; }
+.legacy-warn small { color: #6d4c41; }
+
+/* modal — 備註列 */
+.modal-note {
+  background: #f5f5f5;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #555;
+}
