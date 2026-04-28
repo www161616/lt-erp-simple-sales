@@ -1073,41 +1073,32 @@ function exportDetailExcel() {
   }
 
   const rows = [];
-  let subQty = 0, subSales = 0, subReturns = 0;
+  let subSales = 0, subReturns = 0;
   for (let i = 0; i < _lastDetailRows.length; i++) {
     const r = _lastDetailRows[i];
-    const qty = Number(r.total_qty) || 0;
     const sales = Number(r.sales_amount) || 0;
     const returns = Number(r.returns_amount) || 0;
     const net = Number(r.net_amount) || 0;
-    subQty += qty;
     subSales += sales;
     subReturns += returns;
-
-    let typeText = '一般';
-    if (r.data_type === 'legacy_normal')      typeText = '歷史';
-    else if (r.data_type === 'legacy_return') typeText = '歷史退貨';
 
     rows.push({
       '日期':     r.order_date || '',
       '單號':     r.order_no || '',
-      '類型':     typeText,
-      '件數':     qty,
       '銷貨金額': sales,
       '退貨金額': returns,
       '淨額':     net
     });
   }
   // 小計、月費、店轉店、應收
-  rows.push({ '日期': '【明細小計】', '單號': '', '類型': '', '件數': subQty, '銷貨金額': subSales, '退貨金額': subReturns, '淨額': subSales - subReturns });
-  rows.push({ '日期': '＋月費',        '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailFee });
-  rows.push({ '日期': '＋店轉店淨額',  '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailTransfer });
-  rows.push({ '日期': '【本月應收】',  '單號': '', '類型': '', '件數': '',     '銷貨金額': '',       '退貨金額': '',          '淨額': (subSales - subReturns) + _lastDetailFee + _lastDetailTransfer });
+  rows.push({ '日期': '【明細小計】', '單號': '', '銷貨金額': subSales, '退貨金額': subReturns, '淨額': subSales - subReturns });
+  rows.push({ '日期': '＋月費',        '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailFee });
+  rows.push({ '日期': '＋店轉店淨額',  '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': _lastDetailTransfer });
+  rows.push({ '日期': '【本月應收】',  '單號': '', '銷貨金額': '',       '退貨金額': '',          '淨額': (subSales - subReturns) + _lastDetailFee + _lastDetailTransfer });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
-    { wch: 14 }, { wch: 18 }, { wch: 10 },
-    { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
+    { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
   ];
   // 單號欄文字格式
   for (let r = 2; r <= rows.length + 1; r++) {
@@ -1128,27 +1119,19 @@ function printStoreDetail() {
   }
 
   const rows = _lastDetailRows;
-  let subQty = 0, subSales = 0, subReturns = 0;
+  let subSales = 0, subReturns = 0;
   let bodyHtml = '';
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const qty = Number(r.total_qty) || 0;
     const sales = Number(r.sales_amount) || 0;
     const returns = Number(r.returns_amount) || 0;
     const net = Number(r.net_amount) || 0;
-    subQty += qty;
     subSales += sales;
     subReturns += returns;
-
-    let typeText = '一般';
-    if (r.data_type === 'legacy_normal')      typeText = '歷史';
-    else if (r.data_type === 'legacy_return') typeText = '歷史退貨';
 
     bodyHtml += '<tr>';
     bodyHtml += '<td>' + (r.order_date || '-') + '</td>';
     bodyHtml += '<td class="mono">' + escHtml(r.order_no) + '</td>';
-    bodyHtml += '<td>' + typeText + '</td>';
-    bodyHtml += '<td class="r">' + qty + '</td>';
     bodyHtml += '<td class="r">' + (sales > 0 ? '$' + sales.toLocaleString() : '-') + '</td>';
     bodyHtml += '<td class="r' + (returns > 0 ? ' negative' : '') + '">' + (returns > 0 ? '-$' + returns.toLocaleString() : '-') + '</td>';
     bodyHtml += '<td class="r' + (net < 0 ? ' negative' : '') + '"><b>' + (net < 0 ? '-$' + Math.abs(net).toLocaleString() : '$' + net.toLocaleString()) + '</b></td>';
@@ -1183,20 +1166,19 @@ function printStoreDetail() {
     + '<div class="subtitle">' + _lastDetailStore + ' ' + _lastDetailMonth + ' 月結對帳單</div>'
     + '<table>'
     +   '<thead><tr>'
-    +     '<th>日期</th><th>單號</th><th>類型</th>'
-    +     '<th class="r">件數</th><th class="r">銷貨金額</th><th class="r">退貨金額</th><th class="r">淨額</th>'
+    +     '<th>日期</th><th>單號</th>'
+    +     '<th class="r">銷貨金額</th><th class="r">退貨金額</th><th class="r">淨額</th>'
     +   '</tr></thead>'
-    +   '<tbody>' + (bodyHtml || '<tr><td colspan="7" style="text-align:center;color:#999;">無資料</td></tr>') + '</tbody>'
+    +   '<tbody>' + (bodyHtml || '<tr><td colspan="5" style="text-align:center;color:#999;">無資料</td></tr>') + '</tbody>'
     +   '<tfoot>'
-    +     '<tr class="subtotal-row"><th colspan="3">明細小計</th>'
-    +       '<th class="r">' + subQty + '</th>'
+    +     '<tr class="subtotal-row"><th colspan="2">明細小計</th>'
     +       '<th class="r">$' + subSales.toLocaleString() + '</th>'
     +       '<th class="r' + (subReturns > 0 ? ' negative' : '') + '">' + (subReturns > 0 ? '-$' + subReturns.toLocaleString() : '$0') + '</th>'
     +       '<th class="r">' + (subNet < 0 ? '-$' + Math.abs(subNet).toLocaleString() : '$' + subNet.toLocaleString()) + '</th>'
     +     '</tr>'
-    +     '<tr class="addon-row"><th colspan="6">＋ 月費</th><th class="r">$' + _lastDetailFee.toLocaleString() + '</th></tr>'
-    +     '<tr class="addon-row"><th colspan="6">＋ 店轉店淨額（v2 接入）</th><th class="r">$' + _lastDetailTransfer.toLocaleString() + '</th></tr>'
-    +     '<tr class="total-row"><th colspan="6">本月應收</th>'
+    +     '<tr class="addon-row"><th colspan="4">＋ 月費</th><th class="r">$' + _lastDetailFee.toLocaleString() + '</th></tr>'
+    +     '<tr class="addon-row"><th colspan="4">＋ 店轉店淨額（v2 接入）</th><th class="r">$' + _lastDetailTransfer.toLocaleString() + '</th></tr>'
+    +     '<tr class="total-row"><th colspan="4">本月應收</th>'
     +       '<th class="r">' + (grandNet < 0 ? '-$' + Math.abs(grandNet).toLocaleString() : '$' + grandNet.toLocaleString()) + '</th>'
     +     '</tr>'
     +   '</tfoot>'
